@@ -1,6 +1,6 @@
 import { MODELS } from "./models.generated"
 import { parseSettings } from "./parse-settings"
-import type { GeneratorTab, ModelEntry, Surface } from "./types"
+import type { GeneratorTab, ModelEntry, ModelPlatform, Surface } from "./types"
 
 export { MODELS }
 
@@ -8,6 +8,11 @@ export const SURFACES: readonly Surface[] = ["image", "video", "audio"]
 
 export function findModel(id: string): ModelEntry | undefined {
   return MODELS.find((entry) => entry.id === id)
+}
+
+/** The provider a model runs on (entries without `platform` are Higgsfield). */
+export function platformOf(model: Pick<ModelEntry, "platform">): ModelPlatform {
+  return model.platform ?? "higgsfield"
 }
 
 export function getModel(id: string): ModelEntry {
@@ -51,6 +56,7 @@ export type {
   MediaRole,
   ModelBadge,
   ModelEntry,
+  ModelPlatform,
   PlatformPaths,
   PlatformRequest,
   SettingField,

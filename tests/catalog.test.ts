@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
-import { getModel, MODELS, parseSettings } from "@/generation/catalog"
+import {
+  getModel,
+  MODELS,
+  parseSettings,
+  platformOf,
+} from "@/generation/catalog"
 import { groupMedia, inferInputMode } from "@/generation/catalog/media-inputs"
 import type {
   GenerationPlane,
@@ -79,6 +84,11 @@ type Case = {
 }
 
 const text = (path: string): Case => ({ name: "text", path })
+
+/** Models served by Higgsfield (their bodies are checked against its docs digest). */
+const HIGGSFIELD_MODELS = MODELS.filter(
+  (model) => platformOf(model) === "higgsfield"
+)
 
 const CASES: Record<string, Case[]> = {
   /* Image */
@@ -194,6 +204,42 @@ const CASES: Record<string, Case[]> = {
       name: "references",
       path: "bytedance/seedance-2.5/reference-to-video",
       media: { reference: 2, video: 1, audio: 1 },
+    },
+  ],
+  /* OpenRouter: one endpoint for every mode, so one pricing path per model. */
+  "seedance-2.5-openrouter": [
+    text("openrouter/bytedance/seedance-2.5"),
+    {
+      name: "frames, 720p, auto aspect",
+      path: "openrouter/bytedance/seedance-2.5",
+      media: { start: 1, end: 1 },
+      settings: { resolution: "720p", aspectRatio: "auto", duration: 8 },
+    },
+    {
+      name: "first frame only, no prompt",
+      path: "openrouter/bytedance/seedance-2.5",
+      media: { start: 1 },
+      prompt: "",
+    },
+    {
+      name: "references, silent",
+      path: "openrouter/bytedance/seedance-2.5",
+      media: { reference: 3 },
+      settings: { generateAudio: false, aspectRatio: "9:16" },
+    },
+  ],
+  "seedance-2.0-mini-openrouter": [
+    text("openrouter/bytedance/seedance-2.0-mini"),
+    {
+      name: "frames",
+      path: "openrouter/bytedance/seedance-2.0-mini",
+      media: { start: 1, end: 1 },
+    },
+    {
+      name: "references, 9:21",
+      path: "openrouter/bytedance/seedance-2.0-mini",
+      media: { reference: 2 },
+      settings: { aspectRatio: "9:21", duration: 15 },
     },
   ],
   "seedance-2": [
@@ -668,7 +714,7 @@ describe.skipIf(!existsSync(DIGEST))(
       : new Map<string, Map<string, DocField>>()
     const reached = new Set<string>()
 
-    for (const model of MODELS) {
+    for (const model of HIGGSFIELD_MODELS) {
       for (const c of CASES[model.id] ?? []) {
         it(`${model.id} › ${c.name}`, () => {
           const { path, body } = run(model.id, c)
@@ -779,6 +825,10 @@ describe("catalog metadata", () => {
       it("cites docs pages", () => {
         expect(model.docs.length).toBeGreaterThan(0)
         for (const url of model.docs) {
+          if (platformOf(model) === "openrouter") {
+            expect(url.startsWith("https://openrouter.ai/")).toBe(true)
+            continue
+          }
           expect(url.startsWith(DOCS_PREFIX)).toBe(true)
           // Every cited page was crawled into _reference/docs/models.
           const page = `${url.slice(DOCS_PREFIX.length).replace("/", "__")}.md`

@@ -32,9 +32,11 @@ export type PriceRule = {
    * Where the number came from: "estimate" = POST /estimate (`pnpm
    * pricing:sync`); "description" = hand-derived from the pricing text the
    * estimate endpoint returns for token-metered models; "placeholder" =
-   * unverified (not sold on the live platform until an admin sets a price).
+   * unverified (not sold on the live platform until an admin sets a price);
+   * "openrouter" = derived from OpenRouter's model list (`pnpm
+   * pricing:sync:openrouter`, lib/openrouter/pricing.ts).
    */
-  source: "placeholder" | "estimate" | "description" | "admin"
+  source: "placeholder" | "estimate" | "description" | "admin" | "openrouter"
 }
 
 export type PricingTable = Record<string, PriceRule>

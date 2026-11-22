@@ -17,7 +17,10 @@
     "models": "node scripts/sync-models.mjs",
     "db:init": "tsx --conditions=react-server scripts/db-init.ts",
     "pricing:sync": "tsx --conditions=react-server scripts/sync-pricing.ts",
+    "pricing:sync:openrouter": "tsx scripts/sync-openrouter-pricing.ts",
     "mock:higgsfield": "tsx scripts/mock-higgsfield.ts",
+    "mock:openrouter": "tsx scripts/mock-openrouter.ts",
+    "smoke:openrouter": "tsx --conditions=react-server scripts/smoke-openrouter.ts",
     "email:dev": "email dev --dir emails",
     "db:dev": "tsx scripts/dev-mongo.ts"
   },

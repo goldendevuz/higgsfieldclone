@@ -1,5 +1,6 @@
 import generated from "./pricing.generated.json"
 import type { MediaRole } from "@/generation/catalog/types"
+import { OPENROUTER_PRICING } from "@/lib/openrouter/pricing"
 
 import type { PriceRule, PricingTable } from "./pricing-types"
 
@@ -319,8 +320,12 @@ export const PLACEHOLDER_PRICING: PricingTable = {
   }),
 }
 
-/** Static table: estimate-derived rules (if synced) over placeholders. */
+/**
+ * Static table: estimate-derived rules (if synced) over placeholders, plus the
+ * OpenRouter rules (keyed `openrouter/{slug}`, derived from its model list).
+ */
 export const PRICING_TABLE: PricingTable = {
   ...PLACEHOLDER_PRICING,
   ...(generated as PricingTable),
+  ...OPENROUTER_PRICING,
 }
