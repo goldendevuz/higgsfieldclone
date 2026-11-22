@@ -54,6 +54,15 @@ export function openRouterCallbackUrlFor(
   // OpenRouter only accepts HTTPS callbacks; plain http is for the local mock.
   if (url.protocol !== "https:" && value.NODE_ENV === "production")
     return undefined
+  // The real OpenRouter rejects http and localhost callbacks ("Localhost URLs
+  // are not allowed"): skip the callback, the reconciler finishes the run.
+  const realApi =
+    new URL(value.OPENROUTER_API_BASE_URL).hostname === "openrouter.ai"
+  const local =
+    /^(localhost|127\.|0\.0\.0\.0|\[::1\]|10\.|192\.168\.)/.test(
+      url.hostname
+    ) || url.hostname.endsWith(".local")
+  if (realApi && (url.protocol !== "https:" || local)) return undefined
   url.searchParams.set("gid", generationId)
   url.searchParams.set("t", openRouterWebhookToken(generationId, secret))
   return url.toString()
