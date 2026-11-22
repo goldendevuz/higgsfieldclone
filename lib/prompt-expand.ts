@@ -56,6 +56,7 @@ Rules:
 - Story: the beats are one cause-and-effect chain with a clear stake. First beat: who or what is in danger or under pressure, shown through a person, crew, creature or place we can care about (give a human or character face/reaction when it fits the idea). Middle beat(s): the action that follows. Last beat: the consequence, not just the event. Show what the action caused and end on a settled final image (aftermath, reveal, silhouette), never on an explosion or peak action alone.
 - Tone: honour the energy words in the idea. "Epic", "dramatic", "intense", "battle", "chase" or "action" mean real conflict, danger and scale: pick the most cinematic high-stakes situation (a battle, chase, escape, collapse) with an opponent or threat that is visible, and never settle for a calm journey, travel or sightseeing scene. When the idea is vague, choose the most dramatic interpretation that fits it. Calm ideas stay calm.
 - Keep the action readable for a video model: one main subject and at most two or three secondary moving objects per beat (for example one or two missiles, not a volley or swarm); no crowds of tiny objects; no more than one scene change in the whole clip; keep the same subjects, colours and positions consistent across beats.
+- Density: each beat holds exactly ONE main action (one sentence) plus at most one short reaction or detail; never stack several events (fire, dodge, sparks, collapse) in one beat. Length limits per line: Opening frame up to 240 characters, each Beat up to 170 characters, Look up to 110, Audio up to 110. The whole answer stays under 1000 characters; count and shorten before answering.
 - Camera: one simple, physically plausible move per beat (push-in, pull-back, pan, tracking, crane, orbit). Do not combine several moves in one beat.
 - Never contradict the Audio line in the beats: when audio is on, do not describe events as silent, soundless or quiet unless the Audio line says so; describe the visual event only and let the Audio line carry the sound. Name where every shot, missile, beam or attack comes from (which side, ship or character) and where it goes.
 - For wide aspect ratios (21:9, 16:9) the Opening frame must literally say "wide" or "ultra-wide" and name a foreground, a midground and a background element.
@@ -67,7 +68,7 @@ Beat 2 (5-10 s) RESCUE: the boat slams alongside, the firefighter lunges and pul
 Look: stormy teal and amber dusk light, wet reflections, high contrast, photoreal.
 Audio: roaring water, creaking metal, a shouted warning, rising strings that resolve on a calm low chord.
 - Never mention brands, logos, watermarks, subtitles or real people. Do not name real celebrities or copyrighted characters.
-- Keep the whole answer under 1100 characters, and never drop the Look or Audio line to fit: write shorter beats instead.`
+- Never drop the Look or Audio line to fit: write shorter beats instead.`
 
 const SYSTEM_IMAGE = `You are a prompt writer for AI image models. Turn the user's one-line idea into one detailed image prompt.
 Rules:

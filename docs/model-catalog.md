@@ -20,6 +20,15 @@ contract comes from, and why anything is left out.
   flagged placeholder (`source: "placeholder"`), which the live API never
   sells until an admin prices it (see `docs/runbook.md` → Pricing).
 
+## Availability per visitor
+
+A model is selectable when its provider has the **server key** or the signed-in
+user has stored **their own key** for it (`/account/keys`, see `docs/decisions.md`
+→ BYOK; runs on the user's key cost no credits). Otherwise it is listed in the
+picker's **Inactive: connect your key** section (greyed, "from ✦N", reason,
+Connect key). Only models with a documented or derived price are listed there:
+Higgsfield models priced as `placeholder` are not advertised.
+
 ## OpenRouter (second provider)
 
 Entries with `platform: "openrouter"` run on OpenRouter's video API instead of

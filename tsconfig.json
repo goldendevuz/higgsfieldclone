@@ -41,6 +41,7 @@
     "node_modules",
     "_reference",
     "docs",
-    ".next"
+    ".next",
+    ".next-e2e"
   ]
 }

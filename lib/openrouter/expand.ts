@@ -68,13 +68,21 @@ export function describeExpandError(error: unknown): {
 
 type Options = { fetch?: typeof fetch; timeoutMs?: number }
 
+/** Longer than this and the beats are too dense for a video model: ask once more. */
+const SOFT_MAX_CHARS = 1350
+
 type Expanded = { prompt: string; costUsd?: number }
 
 /** Video prompts must keep their Look line and, with audio on, the Audio line. */
-export function isComplete(input: ExpandInput, prompt: string): boolean {
+function hasRequiredLines(input: ExpandInput, prompt: string): boolean {
   if (input.kind !== "video") return true
   if (!/^Look:/im.test(prompt)) return false
   return input.hasAudio === false || /^Audio:/im.test(prompt)
+}
+
+export function isComplete(input: ExpandInput, prompt: string): boolean {
+  if (input.kind !== "video") return true
+  return prompt.length <= SOFT_MAX_CHARS && hasRequiredLines(input, prompt)
 }
 
 /**
@@ -93,7 +101,15 @@ export async function expandPrompt(
     first.costUsd !== undefined || second.costUsd !== undefined
       ? (first.costUsd ?? 0) + (second.costUsd ?? 0)
       : undefined
-  const best = isComplete(input, second.prompt) ? second : first
+  // Prefer a complete answer; otherwise one that at least keeps its Look/Audio
+  // lines (the shorter), otherwise the first.
+  const candidates = [first, second]
+  const best =
+    candidates.find((item) => isComplete(input, item.prompt)) ??
+    candidates
+      .filter((item) => hasRequiredLines(input, item.prompt))
+      .sort((a, b) => a.prompt.length - b.prompt.length)[0] ??
+    first
   return { prompt: best.prompt, ...(costUsd !== undefined ? { costUsd } : {}) }
 }
 

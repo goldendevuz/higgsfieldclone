@@ -72,6 +72,8 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // A second dev server (E2E on another port) needs its own build directory.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   agentRules: false,
   poweredByHeader: false,
   async headers() {
