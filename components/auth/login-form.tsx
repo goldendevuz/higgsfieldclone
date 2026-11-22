@@ -56,6 +56,14 @@ export function LoginForm({
           <span className="text-foreground">{sentTo}</span>. It expires in an
           hour. You can close this window — the link brings you right back.
         </p>
+        {process.env.NODE_ENV === "development" ? (
+          <a
+            href={`/api/test/login?to=${encodeURIComponent(sentTo)}`}
+            className="rounded-full bg-lime px-4 py-2 text-sm font-semibold text-black"
+          >
+            Dev: sign in now (no email)
+          </a>
+        ) : null}
         <button
           type="button"
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
