@@ -98,12 +98,16 @@ function snapshot(id: string, job: Job): Record<string, unknown> {
       error: "Content policy violation (mock)",
     }
   const seconds = Number(job.body.duration ?? 4) || 4
+  const perSecond = String(job.body.model).includes("mini") ? 0.0336 : 0.1028
   return {
     ...out,
     status: "completed",
     unsigned_urls: [`${API}/videos/${id}/content?index=0`],
-    // Roughly Seedance 2.5 at 480p, so the cost log has realistic numbers.
-    usage: { cost: Number((0.1028 * seconds).toFixed(4)), is_byok: false },
+    // Roughly 480p 16:9 prices per second, so the cost log has realistic numbers.
+    usage: {
+      cost: Number((perSecond * seconds).toFixed(4)),
+      is_byok: false,
+    },
   }
 }
 

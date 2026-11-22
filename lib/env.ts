@@ -16,6 +16,10 @@ const bool = (fallback: boolean) =>
       value === undefined ? fallback : value === "true" || value === "1"
     )
 
+/** A blank variable (`NAME=`) means "use the default", not 0 (a 0 cap would switch protection off). */
+const blankIsDefault = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema)
+
 const optionalString = z
   .string()
   .optional()
@@ -64,9 +68,11 @@ const schema = z.object({
   /** Public HTTPS origin for OpenRouter callbacks; falls back to HF_WEBHOOK_BASE_URL. */
   OPENROUTER_WEBHOOK_BASE_URL: optionalString,
   /** Show a cost warning on OpenRouter runs priced above this many USD (our cost). */
-  OPENROUTER_WARN_USD: z.coerce.number().min(0).default(0.75),
+  OPENROUTER_WARN_USD: blankIsDefault(z.coerce.number().min(0).default(0.75)),
   /** Refuse OpenRouter runs priced above this many USD (our cost). 0 = no cap. */
-  OPENROUTER_MAX_USD_PER_RUN: z.coerce.number().min(0).default(2),
+  OPENROUTER_MAX_USD_PER_RUN: blankIsDefault(
+    z.coerce.number().min(0).default(2)
+  ),
 
   CREDIT_USD_VALUE: z.coerce.number().positive().default(0.01),
   CREDIT_MARKUP: z.coerce.number().min(1).default(2),

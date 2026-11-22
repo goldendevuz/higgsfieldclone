@@ -20,6 +20,41 @@ contract comes from, and why anything is left out.
   flagged placeholder (`source: "placeholder"`), which the live API never
   sells until an admin prices it (see `docs/runbook.md` → Pricing).
 
+## OpenRouter (second provider)
+
+Entries with `platform: "openrouter"` run on OpenRouter's video API instead of
+Higgsfield. They are separate picker entries (ids end in `-openrouter`) so the
+two providers' prices, limits and behaviour never blur. Researched 2026-11-22
+against:
+
+* `https://openrouter.ai/docs/api/api-reference/video-generation/submit-a-video-generation-request` (request body, response, statuses)
+* `https://openrouter.ai/docs/guides/overview/multimodal/video-generation` (flow, webhooks, download)
+* `GET https://openrouter.ai/api/v1/videos/models` (resolutions, aspect ratios, sizes, durations, token prices)
+
+One endpoint (`POST /api/v1/videos`) serves every mode; pricing paths are
+`openrouter/{model slug}`.
+
+| Picker id | Label | Slug | Inputs / modes | Settings (UI → API) | Status |
+|---|---|---|---|---|---|
+| `seedance-2.5-openrouter` | Seedance 2.5 (OpenRouter) | `bytedance/seedance-2.5` | text · first (+ last) frame → `frame_images` · ≤9 image references → `input_references` | aspect auto·16:9·4:3·1:1·3:4·9:16·21:9 (16:9) → `aspect_ratio`; duration 4–30 (4) → `duration`; resolution 480p·720p·1080p (**480p**) → `resolution`; audio (on) → `generate_audio` | Live |
+| `seedance-2.0-mini-openrouter` | Seedance 2.0 Mini (OpenRouter) | `bytedance/seedance-2.0-mini` | as above | as above plus 9:21; duration 4–15; resolution 480p·720p (**480p**) | Live |
+
+Prices (provider cost, no video input, 16:9): Seedance 2.5 about $0.103/s at
+480p, $0.231/s at 720p, $0.569/s at 1080p; Mini about $0.034/s at 480p and
+$0.076/s at 720p (the model list's token prices times tokens per second; see
+`docs/runbook.md` → OpenRouter pricing). Audio does not change the price.
+
+Deliberately **not** offered:
+
+| Capability | Why |
+|---|---|
+| Edit / Extend | The request schema has `previous_job_id` ("ID of a completed video job to edit or extend … only models that support continuation accept this field"), but no page says which models, which fields apply, or how a continuation is billed. Not guessed. |
+| Audio / video references | `input_references` accepts them for Seedance 2+, but input video is billed per second at a different rate and no limits are published. |
+| Cancel | No cancel endpoint is documented; the UI hides Cancel for OpenRouter jobs. |
+| Resolution `size` field | `resolution` + `aspect_ratio` are used; `size` is documented as interchangeable. |
+| 2.5 Flash, Veo, Wan, Kling, … on OpenRouter | Listed by `/videos/models` but not wired; each needs its own mapper and price rule. |
+| `seed`, `watermark`, `provider` routing options | Not exposed in v1. |
+
 Status legend: **Live** = documented REST endpoint, wired into the picker ·
 **Unverified** = seen in the template/CLI/site but not in the REST docs, kept out
 of the picker · **Not in API** = exists only in Higgsfield's own app or agent/CLI

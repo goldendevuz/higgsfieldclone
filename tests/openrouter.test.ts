@@ -225,6 +225,24 @@ describe("OpenRouter pricing", () => {
     )
   })
 
+  it("the cost warning (default $0.75, 150 credits at 2x) skips a 4 s draft and catches long or HD runs", () => {
+    const table = toCreditTable(OPENROUTER_PRICING, {
+      markup: 2,
+      creditUsd: 0.01,
+    })
+    const threshold = Math.ceil((0.75 * 2) / 0.01)
+    const credits = (id: string, settings: Record<string, unknown>) =>
+      priceFor(id, settings, [], table).credits
+    expect(credits("seedance-2.5-openrouter", {})).toBeLessThan(threshold)
+    expect(credits("seedance-2.0-mini-openrouter", {})).toBeLessThan(threshold)
+    expect(
+      credits("seedance-2.5-openrouter", { duration: 10 })
+    ).toBeGreaterThanOrEqual(threshold)
+    expect(
+      credits("seedance-2.5-openrouter", { resolution: "720p" })
+    ).toBeGreaterThanOrEqual(threshold)
+  })
+
   it("720p costs about 2.2x and Mini 480p is the cheapest option", () => {
     const usd = (id: string, settings: Record<string, unknown>) => {
       const req = request(id, [], settings)
@@ -630,6 +648,17 @@ describe("environment", () => {
       higgsfield: false,
       openrouter: true,
     })
+  })
+
+  it("a blank budget variable keeps the default instead of switching the cap off", () => {
+    process.env.OPENROUTER_MAX_USD_PER_RUN = ""
+    process.env.OPENROUTER_WARN_USD = ""
+    resetEnvForTests()
+    expect(env().OPENROUTER_MAX_USD_PER_RUN).toBe(2)
+    expect(env().OPENROUTER_WARN_USD).toBe(0.75)
+    process.env.OPENROUTER_MAX_USD_PER_RUN = "0"
+    resetEnvForTests()
+    expect(env().OPENROUTER_MAX_USD_PER_RUN).toBe(0) // an explicit 0 disables it
   })
 
   it("production boots with OpenRouter only (webhook settings fall back to HF_*)", () => {

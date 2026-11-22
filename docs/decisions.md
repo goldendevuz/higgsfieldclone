@@ -83,6 +83,57 @@ Newest decisions go at the bottom of each section.
   every service key, development allows the documented fallbacks and prints
   one warning line per fallback.
 
+## OpenRouter as a second provider (Nov 2026)
+
+- **Both providers, side by side.** `ModelEntry.platform` (default
+  `"higgsfield"`) and `GenerationDoc.platform` (written on every new
+  generation; missing = Higgsfield, via `platformOfDoc`). Submit, finalize,
+  reconcile, webhook and cancel dispatch on it. Generation is available when at
+  least one provider is configured; models of an unconfigured provider are
+  hidden (`ClientPricing.disabled`) and refused on submit.
+- **`hfRequestId` keeps its name** and holds either provider's job id. Renaming
+  would touch the unique index, every query and all existing documents for no
+  behavioural gain; `platform` says whose id it is.
+- **Separate picker entries** (`…-openrouter`) instead of routing one Seedance
+  entry between providers: different prices, limits (no audio/video
+  references), no cancel, no Edit/Extend.
+- **Ambiguous submits.** Only 429 and 503 are retried on submit (they prove
+  nothing was created). Network errors, timeouts, 500, 502, 504 and a 2xx
+  without a job id are ambiguous, exactly like Higgsfield: no idempotency key,
+  so no retry, and the reconciler refunds after 2 minutes.
+- **Webhooks.** OpenRouter documents an `X-OpenRouter-Signature` HMAC, but only
+  when a signing secret is configured in the workspace. We keep the Higgsfield
+  design instead: a per-generation HMAC token in the callback URL (domain
+  separated from Higgsfield's) and a re-fetch of `GET /videos/{id}`; the payload
+  is never trusted, so a forged delivery can at most trigger a status check.
+  `callback_url` must be HTTPS, so callbacks are skipped for plain-http bases
+  in production. The reconciler remains the fallback.
+- **Downloads need the key**, so finalize fetches `unsigned_urls` server-side
+  with `Authorization` (sent only to the configured API origin) and streams into
+  R2. A key-protected URL is never stored; the signed `urls` are only a
+  temporary fallback after repeated copy failures.
+- **Pricing from the model list.** `usage.cost` is only known after the run and
+  there is no estimate endpoint, so prices come from `/videos/models`
+  (`video_tokens` USD per token × tokens per second, rounded up to the worst
+  aspect ratio). The token formula is an assumption, verified only against the
+  figures we were given; finalize logs `usage.cost` against the basis we
+  charged. The Higgsfield price guard is skipped for OpenRouter; instead a
+  per-run USD cap (`OPENROUTER_MAX_USD_PER_RUN`, default 2) and a UI warning
+  (`OPENROUTER_WARN_USD`, default 0.75) protect a small budget.
+  Mini at 480p is about $0.034/s (a 4 s clip ≈ $0.13), above the $0.01345/s we
+  were first given; the list's own `video_tokens` price says so.
+- **Budget defaults.** 480p and 4 s are the defaults of every OpenRouter model.
+- **Cancel.** No endpoint is documented, so none is faked: the action is refused
+  and the tile hides the button. The run timeout still refunds.
+- **Uploads without Higgsfield.** OpenRouter has no upload endpoint and wants
+  https or base64 image URLs. With no Higgsfield key, the upload ticket points
+  at our own HMAC-signed `PUT /api/upload/direct` that writes into R2 (or
+  `.data/media`). With a Higgsfield key the original flow is unchanged. Local
+  (non-https) images are inlined as data URLs for the OpenRouter request only
+  (≤ 8 MB) and never stored.
+- **`.env.example`** now ships `HF_CREDENTIALS=` empty (the old placeholder
+  would have counted as a configured provider).
+
 ## Auth
 
 - Auth.js v5, Resend provider (magic link only), MongoDB adapter, database
