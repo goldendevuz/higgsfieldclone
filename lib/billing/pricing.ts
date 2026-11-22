@@ -91,6 +91,8 @@ export type ClientPricing = {
   fromPrices: Record<string, number>
   /** Credits above which an OpenRouter run shows a cost warning. */
   expensiveCredits: number
+  /** The "Expand prompt" button needs an OpenRouter key. */
+  canExpandPrompt: boolean
 }
 
 export async function clientPricing(): Promise<ClientPricing> {
@@ -107,5 +109,6 @@ export async function clientPricing(): Promise<ClientPricing> {
     disabled: [...new Set([...context.disabled, ...context.unavailable])],
     fromPrices,
     expensiveCredits: Math.ceil((OPENROUTER_WARN_USD * markup) / creditUsd),
+    canExpandPrompt: providersConfigured().openrouter,
   }
 }

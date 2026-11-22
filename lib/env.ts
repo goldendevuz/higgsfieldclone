@@ -63,6 +63,8 @@ const schema = z.object({
   /** OpenRouter (https://openrouter.ai/docs/api-reference/authentication): Bearer key, server-side only. */
   OPENROUTER_API_KEY: optionalString,
   OPENROUTER_API_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
+  /** Cheap text model for the "Expand prompt" button (default qwen/qwen3.7-flash). */
+  OPENROUTER_EXPAND_MODEL: optionalString,
   /** Signs OpenRouter callback URLs; falls back to HF_WEBHOOK_SECRET. */
   OPENROUTER_WEBHOOK_SECRET: optionalString,
   /** Public HTTPS origin for OpenRouter callbacks; falls back to HF_WEBHOOK_BASE_URL. */
