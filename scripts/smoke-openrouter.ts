@@ -4,7 +4,7 @@
  * money, so it does nothing without --yes and prints the estimate first.
  *
  *   pnpm smoke:openrouter mini           # dry run: Seedance 2.0 Mini, 4 s, 480p
- *   pnpm smoke:openrouter mini --yes     # sends it (about $0.13)
+ *   pnpm smoke:openrouter mini --yes     # sends it (about $0.14)
  *   pnpm smoke:openrouter seedance-2.5 --yes   # Seedance 2.5, 4 s, 480p (about $0.41)
  *
  * It reads OPENROUTER_API_KEY (and OPENROUTER_API_BASE_URL) from .env.local or

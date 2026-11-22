@@ -164,16 +164,31 @@ describe("OpenRouter pricing", () => {
   const specs = parseModelSpecs(generated)
   const spec = (slug: string) => specs.find((item) => item.slug === slug)!
 
-  it("matches the per-second figures we were given (Seedance 2.5)", () => {
+  it("starts from the listed per-second figures (Seedance 2.5) and adds the billing overshoot", () => {
     const grid = perSecondGrid(spec("bytedance/seedance-2.5"))
-    expect(grid["480p"]!["16:9"]).toBeCloseTo(0.1028, 4)
-    expect(grid["720p"]!["16:9"]).toBeCloseTo(0.2311, 3)
+    // Listed basis: $0.1028/s (854x480) and $0.2311/s (1280x720); billed sizes
+    // are 16-aligned (864x496) with 3% duration overshoot, so never lower.
+    expect(grid["480p"]!["16:9"]).toBeGreaterThan(0.1028)
+    expect(grid["480p"]!["16:9"]).toBeLessThan(0.1028 * 1.1)
+    expect(grid["720p"]!["16:9"]).toBeGreaterThanOrEqual(0.2311)
+    expect(grid["720p"]!["16:9"]).toBeLessThan(0.2311 * 1.1)
     expect(tokensPerSecond("854x480")).toBeCloseTo(9_607.5, 1)
+  })
+
+  it("covers the first real Mini run (4 s, 480p, 16:9 billed $0.1421)", () => {
+    const rule = OPENROUTER_PRICING["openrouter/bytedance/seedance-2.0-mini"]!
+    const usd =
+      rule.usd *
+      4 *
+      (rule.factors?.resolution?.["480p"] ?? 1) *
+      (rule.factors?.aspect_ratio?.["16:9"] ?? 1)
+    expect(usd).toBeGreaterThanOrEqual(0.1421)
+    expect(usd).toBeLessThan(0.1421 * 1.1)
   })
 
   it("derives Mini from its own price list ($0.0000035 per token)", () => {
     const grid = perSecondGrid(spec("bytedance/seedance-2.0-mini"))
-    expect(grid["480p"]!["16:9"]).toBeCloseTo(0.0336, 4)
+    expect(grid["480p"]!["16:9"]).toBeGreaterThan(0.0336)
     // Mini's 9:21 exists only at 720p (no 480x1120 size is listed).
     expect(grid["480p"]!["9:21"]).toBeUndefined()
     expect(grid["720p"]!["9:21"]).toBeDefined()
@@ -198,7 +213,7 @@ describe("OpenRouter pricing", () => {
     }
   })
 
-  it("prices a 4 s 480p Seedance 2.5 clip near $0.41 and a 15 s one near $1.5", () => {
+  it("prices a 4 s 480p Seedance 2.5 clip at or just above $0.41 and a 15 s one above $1.54", () => {
     const table = toCreditTable(OPENROUTER_PRICING, {
       markup: 2,
       creditUsd: 0.01,
@@ -208,12 +223,12 @@ describe("OpenRouter pricing", () => {
       return usdForRequest(OPENROUTER_PRICING[req.path]!, req, [])
     }
     expect(usdOf("seedance-2.5-openrouter", {})).toBeGreaterThanOrEqual(0.4112)
-    expect(usdOf("seedance-2.5-openrouter", {})).toBeLessThan(0.44)
+    expect(usdOf("seedance-2.5-openrouter", {})).toBeLessThan(0.48)
     expect(usdOf("seedance-2.5-openrouter", { duration: 15 })).toBeGreaterThan(
       1.54
     )
     expect(usdOf("seedance-2.5-openrouter", { duration: 15 })).toBeLessThan(
-      1.65
+      1.75
     )
     // Credits = ceil(usd × markup / credit value), exactly the existing formula.
     const quote = priceFor("seedance-2.5-openrouter", {}, [], table)

@@ -268,3 +268,13 @@ image, Plus 6 / 8, Ultra 8 / 12.
   the URL plus re-fetching the status. Revisit if the docs add a signature.
 - **Accessibility:** secondary text is `#9a9b9d` (Quanta's `#828282` fails
   4.5:1 on card surfaces). Lighthouse accessibility: 97+ on the generators.
+
+### OpenRouter billing is for what is rendered (first real run, 2026-11-22)
+
+A real Seedance 2.0 Mini job (4 s, 480p, 16:9) was billed $0.1421, against $0.1345
+on the listed 854×480 × 4 s basis (+5.6%). The file was 864×496 and 4.096 s. Prices
+now use the next multiple of 16 above each listed dimension and a 3% duration
+overshoot (`lib/openrouter/pricing.ts`), so a 4 s Mini clip prices at about $0.145 and
+Seedance 2.5 at 480p a little above $0.41. Only one real sample exists: re-check with
+`pnpm smoke:openrouter seedance-2.5 --yes` and keep watching the `usage.cost` log in
+finalize.

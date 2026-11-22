@@ -27,6 +27,18 @@ import generated from "./models.generated.json"
 
 const FPS = 24
 const TOKEN_DIVISOR = 1024
+/**
+ * The first real run (Seedance 2.0 Mini, 4 s, 480p, 16:9) came back as an
+ * 864×496 file of 4.096 s and was billed $0.1421, 5.6% above the listed
+ * 854×480 × 4 s basis ($0.1345). So the provider bills what it renders:
+ * dimensions rounded up to the next multiple of 16 above the listed size and a duration a little over the
+ * request. Prices are computed on that, never below the real cost.
+ */
+const SIZE_ALIGN = 16
+const DURATION_MARGIN = 1.03
+/** Next multiple of 16 strictly above `value`: 480 renders as 496, 854 as 864. */
+const alignUp = (value: number) =>
+  (Math.floor(value / SIZE_ALIGN) + 1) * SIZE_ALIGN
 
 export type OpenRouterModelSpec = {
   slug: string
@@ -78,7 +90,15 @@ function pixelsOf(size: string): number {
   return width * height
 }
 
-/** Tokens generated per second of output at `size`. */
+/** Billed tokens per requested second: rendered (16-aligned) size plus the duration overshoot. */
+export function billedTokensPerSecond(size: string): number {
+  const { width, height } = parseSize(size)
+  return (
+    ((alignUp(width) * alignUp(height) * FPS) / TOKEN_DIVISOR) * DURATION_MARGIN
+  )
+}
+
+/** Tokens generated per second of output at `size` (the listed, unaligned size). */
 export function tokensPerSecond(size: string): number {
   const { width, height } = parseSize(size)
   return (width * height * FPS) / TOKEN_DIVISOR
@@ -155,7 +175,7 @@ export function perSecondGrid(
     ranked.forEach(({ size }, index) => {
       const resolution = resolutions[offset + index]!
       const rate = spec.tokenUsd[resolution] ?? spec.tokenUsd.default!
-      ;(grid[resolution] ??= {})[aspect] = tokensPerSecond(size) * rate
+      ;(grid[resolution] ??= {})[aspect] = billedTokensPerSecond(size) * rate
     })
   }
   return grid

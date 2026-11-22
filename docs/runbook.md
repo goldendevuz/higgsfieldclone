@@ -125,7 +125,7 @@ Spends real money, one job per command, nothing is sent without `--yes`:
 ```bash
 export OPENROUTER_API_KEY=sk-or-v1-...        # not committed; or in .env.local
 pnpm smoke:openrouter mini                    # dry run: prints model, 4 s, 480p, estimate
-pnpm smoke:openrouter mini --yes              # Seedance 2.0 Mini, 4 s, 480p (about $0.13)
+pnpm smoke:openrouter mini --yes              # Seedance 2.0 Mini, 4 s, 480p (about $0.14)
 pnpm smoke:openrouter seedance-2.5 --yes      # optional: Seedance 2.5, 4 s, 480p (about $0.41)
 ```
 

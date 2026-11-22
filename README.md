@@ -141,7 +141,7 @@ creates exactly one job and prints what it billed):
 ```bash
 export OPENROUTER_API_KEY=sk-or-v1-...        # or put it in .env.local; never commit it
 pnpm smoke:openrouter mini                    # dry run, shows the estimate
-pnpm smoke:openrouter mini --yes              # 4 s, 480p, Seedance 2.0 Mini (about $0.13)
+pnpm smoke:openrouter mini --yes              # 4 s, 480p, Seedance 2.0 Mini (about $0.14)
 pnpm smoke:openrouter seedance-2.5 --yes      # optional: 4 s, 480p, Seedance 2.5 (about $0.41)
 ```
 
