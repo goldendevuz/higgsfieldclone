@@ -58,6 +58,12 @@ call; should OpenRouter finish it later, the callback or the next poll still
 delivers the video free of charge (logged as "late delivery"), so that run costs
 us the provider fee. Keep the timeout generous.
 
+### Prompt expansion cost
+
+`POST /api/prompt/expand` is free for users (no ledger entry) but costs us a fraction
+of a cent per call on OpenRouter; each call logs `[expand] user … cost $…`. It is
+rate limited to 20 per user per hour (`LIMITS.expandPerUser`).
+
 ### OpenRouter downloads
 
 The finished video is fetched server-side with `Authorization: Bearer
@@ -76,6 +82,8 @@ from the job are used as a temporary fallback until the copy succeeds.
 | `OPERATOR ALERT: Platform concurrency limit reached` | Account concurrency cap | Ask Higgsfield for higher limits; lower plan concurrency |
 | `OPERATOR ALERT: OpenRouter rejected OPENROUTER_API_KEY (401)` | Key revoked/rotated | Update `OPENROUTER_API_KEY`, redeploy |
 | `OPERATOR ALERT: OpenRouter account is out of credits (402)` | OpenRouter balance empty | Add credits at openrouter.ai/credits; users see "temporarily unavailable" and are refunded |
+| `OPERATOR ALERT: OpenRouter refused the key for prompt expansion (401/403)` | Key revoked, or the workspace budget is used up (403 "budget exceeded") | Fix the key/budget; the Expand button then shows "temporarily unavailable" and nothing else is affected |
+| `OPERATOR ALERT: OPENROUTER_EXPAND_MODEL is not available` | Model slug retired | Set `OPENROUTER_EXPAND_MODEL` to a live text model (a `:free` one works as a fallback) |
 | `[pricing] provider cost above our price basis` | OpenRouter billed more than our table | Run `pnpm pricing:sync:openrouter`; check the token formula in `lib/openrouter/pricing.ts` |
 | `[pricing] live cost … exceeds our price basis` | Price table stale | Admin → Models & pricing, or `pnpm pricing:sync` |
 
