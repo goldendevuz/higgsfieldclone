@@ -294,3 +294,22 @@ describe("route and rate limit", () => {
     resetEnvForTests()
   })
 })
+
+describe("video system prompt rules", () => {
+  it("keeps the story, tone, readability and no-drop rules", async () => {
+    const { buildExpandMessages } = await import("@/lib/prompt-expand")
+    const system = buildExpandMessages({
+      prompt: "an epic sci-fi scene",
+      kind: "video",
+      durationSec: 15,
+      aspectRatio: "21:9",
+      hasAudio: true,
+    })[0]!.content
+    expect(system).toMatch(/already be visible or clearly implied/)
+    expect(system).toMatch(/who or what is in danger/)
+    expect(system).toMatch(/consequence, not just the event/)
+    expect(system).toMatch(/never settle for a calm journey/)
+    expect(system).toMatch(/at most two or three secondary moving objects/)
+    expect(system).toMatch(/never drop the Look or Audio line/)
+  })
+})
