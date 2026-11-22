@@ -68,10 +68,39 @@ export function describeExpandError(error: unknown): {
 
 type Options = { fetch?: typeof fetch; timeoutMs?: number }
 
+type Expanded = { prompt: string; costUsd?: number }
+
+/** Video prompts must keep their Look line and, with audio on, the Audio line. */
+export function isComplete(input: ExpandInput, prompt: string): boolean {
+  if (input.kind !== "video") return true
+  if (!/^Look:/im.test(prompt)) return false
+  return input.hasAudio === false || /^Audio:/im.test(prompt)
+}
+
+/**
+ * One text call; if the model dropped the Look/Audio line, one more call
+ * (a text rewrite is safe to repeat and costs a fraction of a cent).
+ */
 export async function expandPrompt(
   input: ExpandInput,
   options: Options = {}
-): Promise<{ prompt: string; costUsd?: number }> {
+): Promise<Expanded> {
+  const first = await expandOnce(input, options)
+  if (isComplete(input, first.prompt)) return first
+  const second = await expandOnce(input, options).catch(() => undefined)
+  if (!second) return first
+  const costUsd =
+    first.costUsd !== undefined || second.costUsd !== undefined
+      ? (first.costUsd ?? 0) + (second.costUsd ?? 0)
+      : undefined
+  const best = isComplete(input, second.prompt) ? second : first
+  return { prompt: best.prompt, ...(costUsd !== undefined ? { costUsd } : {}) }
+}
+
+async function expandOnce(
+  input: ExpandInput,
+  options: Options
+): Promise<Expanded> {
   const config = env()
   if (!config.OPENROUTER_API_KEY)
     throw new UserFacingError(

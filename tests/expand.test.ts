@@ -147,12 +147,20 @@ describe("expandPrompt + error mapping", () => {
 
   it("posts to chat/completions with the key and returns text and cost", async () => {
     const fetchMock = reply(200, {
-      choices: [{ message: { content: "Opening frame: a fox." } }],
+      choices: [
+        {
+          message: {
+            content:
+              "Opening frame: a fox.\nBeat 1 (0-5 s) FOX: it runs. Camera: tracking.\nLook: warm.\nAudio: wind.",
+          },
+        },
+      ],
       usage: { cost: 0.00003 },
     })
     const result = await expandPrompt(input, { fetch: fetchMock })
     expect(result).toEqual({
-      prompt: "Opening frame: a fox.",
+      prompt:
+        "Opening frame: a fox.\nBeat 1 (0-5 s) FOX: it runs. Camera: tracking.\nLook: warm.\nAudio: wind.",
       costUsd: 0.00003,
     })
     const [url, init] = fetchMock.mock.calls[0] as unknown as [
@@ -167,6 +175,42 @@ describe("expandPrompt + error mapping", () => {
     expect(body.model).toBe("qwen/qwen3.7-flash")
     expect(body.max_tokens).toBe(600)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("asks once more when the Audio line was dropped, and sums the cost", async () => {
+    const bad = {
+      choices: [{ message: { content: "Opening frame: a fox.\nLook: warm." } }],
+      usage: { cost: 0.00003 },
+    }
+    const good = {
+      choices: [
+        {
+          message: {
+            content: "Opening frame: a fox.\nLook: warm.\nAudio: wind.",
+          },
+        },
+      ],
+      usage: { cost: 0.00004 },
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(bad), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(good), { status: 200 })
+      )
+    const result = await expandPrompt(input, { fetch: fetchMock })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.prompt).toMatch(/Audio: wind/)
+    expect(result.costUsd).toBeCloseTo(0.00007, 8)
+    const noAudio = await expandPrompt(
+      { ...input, hasAudio: false },
+      {
+        fetch: vi.fn(
+          async () => new Response(JSON.stringify(bad), { status: 200 })
+        ),
+      }
+    )
+    expect(noAudio.prompt).toMatch(/Look: warm/)
   })
 
   it("does not retry and never leaks upstream details", async () => {
@@ -311,5 +355,7 @@ describe("video system prompt rules", () => {
     expect(system).toMatch(/never settle for a calm journey/)
     expect(system).toMatch(/at most two or three secondary moving objects/)
     expect(system).toMatch(/never drop the Look or Audio line/)
+    expect(system).toMatch(/Never contradict the Audio line/)
+    expect(system).toMatch(/literally say "wide"/)
   })
 })
