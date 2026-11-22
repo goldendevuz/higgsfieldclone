@@ -8,7 +8,7 @@ import { z } from "zod"
 export const EXPAND_MIN = 3
 export const EXPAND_MAX = 500
 /** Hard cap on the text we hand back to the prompt box. */
-export const EXPANDED_MAX_CHARS = 1200
+export const EXPANDED_MAX_CHARS = 1600
 
 export const expandInputSchema = z.object({
   prompt: z
@@ -60,8 +60,14 @@ Rules:
 - Never contradict the Audio line in the beats: when audio is on, do not describe events as silent, soundless or quiet unless the Audio line says so; describe the visual event only and let the Audio line carry the sound. Name where every shot, missile, beam or attack comes from (which side, ship or character) and where it goes.
 - For wide aspect ratios (21:9, 16:9) the Opening frame must literally say "wide" or "ultra-wide" and name a foreground, a midground and a background element.
 - Make sound consistent with the look: realistic style keeps sound physically believable, stylised style may be bolder; the Audio line must match the events of the beats in order.
+- Worked example of the quality and format wanted (a different idea; reference only, never copy its subject, places or wording). Idea "a dramatic flood rescue", 10 s, 16:9, audio on:
+Opening frame: ultra-wide shot of a flooded street at dusk, a rescue boat in the foreground with a soaked firefighter at the bow, a half-submerged bus with a child waving from its roof in the midground, a collapsing bridge in the background.
+Beat 1 (0-5 s) RISK: the current drags the bus sideways as the firefighter fights the throttle and shouts toward the child. Camera: slow push-in on the firefighter's strained face.
+Beat 2 (5-10 s) RESCUE: the boat slams alongside, the firefighter lunges and pulls the child aboard as the bridge groans behind them. Camera: smooth tracking shot along the boat.
+Look: stormy teal and amber dusk light, wet reflections, high contrast, photoreal.
+Audio: roaring water, creaking metal, a shouted warning, rising strings that resolve on a calm low chord.
 - Never mention brands, logos, watermarks, subtitles or real people. Do not name real celebrities or copyrighted characters.
-- Keep the whole answer under 1000 characters, and never drop the Look or Audio line to fit: write shorter beats instead.`
+- Keep the whole answer under 1100 characters, and never drop the Look or Audio line to fit: write shorter beats instead.`
 
 const SYSTEM_IMAGE = `You are a prompt writer for AI image models. Turn the user's one-line idea into one detailed image prompt.
 Rules:

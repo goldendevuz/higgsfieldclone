@@ -152,7 +152,7 @@ button: it turns a one-line idea into a detailed prompt (opening frame, timed
 beats that match the chosen duration, camera, look and, with audio on, an
 `Audio:` line; images get subject/setting/composition/look). **Undo** restores
 your text. It costs no credits; the provider cost is a fraction of a cent per
-use (default model `qwen/qwen3.7-flash`, change with `OPENROUTER_EXPAND_MODEL`)
+use (default model `anthropic/claude-haiku-5.5`, change with `OPENROUTER_EXPAND_MODEL`)
 and is logged as `[expand] ... cost $...`. Limit: 20 per user per hour. The
 button is hidden when `OPENROUTER_API_KEY` is unset. The mock
 (`pnpm mock:openrouter`) answers `/chat/completions` offline.

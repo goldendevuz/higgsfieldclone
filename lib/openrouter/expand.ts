@@ -15,7 +15,7 @@ import {
  * from the upstream error reaches the user.
  */
 
-export const DEFAULT_EXPAND_MODEL = "qwen/qwen3.7-flash"
+export const DEFAULT_EXPAND_MODEL = "anthropic/claude-haiku-5.5"
 export const EXPAND_TIMEOUT_MS = 30_000
 
 export function expandConfigured(): boolean {
@@ -126,8 +126,8 @@ async function expandOnce(
       body: JSON.stringify({
         model,
         messages: buildExpandMessages(input),
-        max_tokens: 600,
-        temperature: 0.8,
+        max_tokens: 900,
+        temperature: 0.6,
         reasoning: { enabled: false },
       }),
       signal: controller.signal,

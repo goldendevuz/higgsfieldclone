@@ -172,8 +172,8 @@ describe("expandPrompt + error mapping", () => {
       "Bearer sk-or-v1-test-key-0123456789"
     )
     const body = JSON.parse(String(init.body))
-    expect(body.model).toBe("qwen/qwen3.7-flash")
-    expect(body.max_tokens).toBe(600)
+    expect(body.model).toBe("anthropic/claude-haiku-5.5")
+    expect(body.max_tokens).toBe(900)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
