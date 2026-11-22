@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 
 import { Canvas } from "./canvas"
 import { ControlPanel, GenerateButton } from "./control-panel"
+import { NoActiveModels } from "./inactive-models"
 import { ModelIcon, ModelPicker } from "./model-picker"
 import { useGenerator, type Generator } from "./use-generator"
 
@@ -27,12 +28,7 @@ export function GeneratorView({
   presets: PresetView[]
 }) {
   const generator = useGenerator(surface, presets)
-  if (!generator.model)
-    return (
-      <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-        No {surface} models are available right now.
-      </div>
-    )
+  if (!generator.model) return <NoActiveModels surface={surface} />
   return surface === "image" ? (
     <ImageLayout generator={generator} />
   ) : (
@@ -122,6 +118,8 @@ function ImageLayout({ generator }: { generator: Generator }) {
             modelSlot={
               <ModelPicker
                 models={generator.models}
+                surface={generator.surface}
+                tab={generator.tab}
                 value={model.id}
                 onChange={generator.chooseModel}
                 trigger={

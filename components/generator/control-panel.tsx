@@ -73,6 +73,8 @@ export function ModelCard({ generator }: { generator: Generator }) {
       </div>
       <ModelPicker
         models={generator.models}
+        surface={generator.surface}
+        tab={generator.tab}
         value={model.id}
         onChange={generator.chooseModel}
         trigger={
@@ -345,6 +347,8 @@ export function ModelRow({ generator }: { generator: Generator }) {
   return (
     <ModelPicker
       models={generator.models}
+      surface={generator.surface}
+      tab={generator.tab}
       value={model.id}
       onChange={generator.chooseModel}
       trigger={

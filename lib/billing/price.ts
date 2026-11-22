@@ -288,9 +288,9 @@ const ROLE_SAMPLE: Record<MediaItem["role"], MediaItem["kind"]> = {
 }
 
 /** Default-settings quote for the picker's "from ✦N" (5 s sample inputs when required). */
-export function fromPrice(modelId: string, table: CreditTable): number | null {
+export function fromQuote(modelId: string, table: CreditTable): Quote | null {
   const plain = tryPriceFor(modelId, {}, [], table)
-  if (plain) return plain.credits
+  if (plain) return plain
   const model = getModel(modelId)
   const needed = new Set(model.requiredRoles ?? [])
   if (!needed.size) {
@@ -311,5 +311,9 @@ export function fromPrice(modelId: string, table: CreditTable): number | null {
       role: "reference",
       kind: "image",
     })
-  return tryPriceFor(modelId, {}, sample, table)?.credits ?? null
+  return tryPriceFor(modelId, {}, sample, table)
+}
+
+export function fromPrice(modelId: string, table: CreditTable): number | null {
+  return fromQuote(modelId, table)?.credits ?? null
 }

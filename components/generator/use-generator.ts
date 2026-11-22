@@ -87,7 +87,14 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
   const pendingResume = useRef(false)
 
   const disabled = useMemo(() => new Set(pricing.disabled), [pricing.disabled])
-  const tabs = useMemo(() => tabsFor(surface), [surface])
+  // Only tabs that have at least one usable model (an Edit tab whose models
+  // all need a missing key would leave the generator empty).
+  const tabs = useMemo(() => {
+    const usable = tabsFor(surface).filter((value) =>
+      modelsFor(surface, value).some((entry) => !disabled.has(entry.id))
+    )
+    return usable.length ? usable : tabsFor(surface).slice(0, 1)
+  }, [disabled, surface])
   const tab: GeneratorTab = tabs.includes(dock.tab)
     ? dock.tab
     : (tabs[0] ?? "create")

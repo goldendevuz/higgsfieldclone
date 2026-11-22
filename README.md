@@ -10,7 +10,7 @@ accent, generator panel, justified feeds); the brand, copy and media are ours.
 
 **Two generation providers, side by side.** Besides Higgsfield, models can run
 through [OpenRouter](https://openrouter.ai) (pay as you go, no subscription):
-**Seedance 2.5** and the cheap **Seedance 2.0 Mini** (plus 23 more text and
+**Seedance 2.5** and the cheap **Seedance 2.0 Mini** (plus 21 more text and
 image-to-video models: Seedance 2.0 / Fast / 2.5 Flash, Veo 3.1 family, Gemini
 Omni, Grok Imagine, Wan 3.0, HappyHorse, MiniMax H3 / Hailuo, Runway Gen-4.5,
 FLUX.3 Video, Mischief 1) are in the picker as "(OpenRouter)" entries. Configure either provider, or both; a provider without
