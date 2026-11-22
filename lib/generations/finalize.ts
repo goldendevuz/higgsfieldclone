@@ -7,19 +7,19 @@ import { roundCredits } from "@/lib/billing/price"
 import {
   collections,
   IN_FLIGHT,
-  platformOfDoc,
   type GenerationDoc,
   type GenerationOutput,
 } from "@/lib/db/collections"
-import { higgsfield } from "@/lib/higgsfield/client"
 import { describeTerminal } from "@/lib/higgsfield/errors"
 import {
   PLATFORM_TERMINAL,
   type PlatformArtifact,
   type RequestStatus,
 } from "@/lib/higgsfield/types"
-import { openrouter } from "@/lib/openrouter/client"
+import { UserKeyMissingError } from "@/lib/byok/keys"
 import { copyFromUrl } from "@/lib/storage"
+
+import { keyGoneMessage, openrouterFor, statusFor } from "./credentials"
 
 /**
  * finalizeGeneration — the only way a run reaches a terminal state. Called by
@@ -45,20 +45,49 @@ export type FinalizeOutcome =
   | "completed"
   | "refunded"
   | "copy_retry"
+  | "key_gone"
 
 type Deps = {
   status: (gen: GenerationDoc, requestId: string) => Promise<RequestStatus>
   copy: typeof copyFromUrl
 }
 
-/** Ask the provider that owns the generation (old documents are Higgsfield). */
+/**
+ * Ask the provider that owns the generation, with the key it was submitted
+ * with (old documents are Higgsfield on the server key).
+ */
 async function providerStatus(
   gen: GenerationDoc,
   requestId: string
 ): Promise<RequestStatus> {
-  return platformOfDoc(gen) === "openrouter"
-    ? openrouter().status(requestId)
-    : higgsfield().status(requestId)
+  return statusFor(gen, requestId)
+}
+
+/**
+ * The user's own key is gone (deleted, or unreadable): the job can't be
+ * followed any more. It ends as failed with a safe message. Nothing was
+ * charged in credits for a user-key job, so there is nothing to refund, and
+ * we never try another key.
+ */
+async function failKeyGone(
+  gen: GenerationDoc,
+  error: UserKeyMissingError
+): Promise<FinalizeOutcome> {
+  const { generations } = await collections()
+  await generations.updateOne(
+    { _id: gen._id, status: { $in: [...IN_FLIGHT] } },
+    {
+      $set: {
+        status: "failed",
+        error: keyGoneMessage(error),
+        errorKind: "failed",
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      },
+      $unset: { finalizeLeaseUntil: "" },
+    }
+  )
+  return "key_gone"
 }
 
 export async function finalizeGeneration(
@@ -71,7 +100,13 @@ export async function finalizeGeneration(
   if (!IN_FLIGHT.includes(gen.status)) return "already_terminal"
   if (!gen.hfRequestId) return "not_submitted"
 
-  const status = await deps.status(gen, gen.hfRequestId)
+  let status: RequestStatus
+  try {
+    status = await deps.status(gen, gen.hfRequestId)
+  } catch (error) {
+    if (error instanceof UserKeyMissingError) return failKeyGone(gen, error)
+    throw error
+  }
   if (!PLATFORM_TERMINAL.has(status.status)) {
     const next = status.status === "in_progress" ? "in_progress" : gen.status
     await generations.updateOne(
@@ -101,7 +136,13 @@ export async function finalizeGeneration(
 
   const media = status.artifacts.filter((artifact) => artifact.kind !== "file")
   if (status.status === "completed" && media.length > 0) {
-    const outputs = await copyOutputs(leased, media, deps.copy)
+    let outputs: GenerationOutput[] | null
+    try {
+      outputs = await copyOutputs(leased, media, deps.copy)
+    } catch (error) {
+      if (error instanceof UserKeyMissingError) return failKeyGone(gen, error)
+      throw error
+    }
     if (!outputs) {
       await generations.updateOne(
         { _id: gen._id },
@@ -172,14 +213,19 @@ async function copyOutputs(
 ): Promise<GenerationOutput[] | null> {
   const outputs: GenerationOutput[] = []
   const base = `u/${gen.userId.toHexString()}/${gen._id.toHexString()}`
+  // Key-protected downloads (OpenRouter) use the key the job was submitted
+  // with, resolved once; a missing user key propagates (not a copy failure).
+  const client = artifacts.some((artifact) => artifact.authorized)
+    ? await openrouterFor(gen)
+    : undefined
   for (const [index, artifact] of artifacts.entries()) {
     const kind = artifact.kind === "file" ? gen.surface : artifact.kind
     try {
       const stored = await copy(artifact.url, `${base}/${index}`, {
         contentType: artifact.contentType ?? defaultType(kind),
-        // Key-protected downloads (OpenRouter) send the key to its origin only.
-        ...(artifact.authorized
-          ? { headers: openrouter().mediaHeaders(artifact.url) }
+        // The key goes to the API origin only.
+        ...(artifact.authorized && client
+          ? { headers: client.mediaHeaders(artifact.url) }
           : {}),
       })
       outputs.push({
@@ -242,7 +288,7 @@ async function recordProviderCost(
     { _id: gen._id },
     { $set: { providerCostUsd: costUsd } }
   )
-  const line = `${gen.modelId}: provider billed $${costUsd.toFixed(4)}, our basis $${gen.priceUsd.toFixed(4)} (${gen.cost} credits charged)`
+  const line = `${gen.modelId}: provider billed $${costUsd.toFixed(4)}, our basis $${gen.priceUsd.toFixed(4)} (${gen.cost} credits charged, ${gen.keySource ?? "server"} key)`
   if (costUsd > gen.priceUsd * 1.01)
     console.error(`[pricing] provider cost above our price basis. ${line}`)
   else console.info(`[pricing] ${line}`)

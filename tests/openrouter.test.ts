@@ -640,6 +640,7 @@ describe("environment", () => {
       "OPENROUTER_API_BASE_URL",
       "OPENROUTER_WEBHOOK_SECRET",
       "OPENROUTER_WEBHOOK_BASE_URL",
+      "BYOK_ENCRYPTION_KEY",
     ])
       delete process.env[key]
     for (const [key, value] of Object.entries(overrides))
@@ -687,8 +688,13 @@ describe("environment", () => {
 
   it("production refuses to boot with no provider, or OpenRouter without callbacks", () => {
     production({})
-    expect(() => env()).toThrow(/at least one provider/)
+    expect(() => env()).toThrow(/at least one way to generate/)
     production({ OPENROUTER_API_KEY: "sk-or-v1-x" })
     expect(() => env()).toThrow(/OPENROUTER_WEBHOOK_SECRET/)
+    // Users' own keys alone are a way to generate; the key must be 32 bytes.
+    production({ BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") })
+    expect(() => env()).not.toThrow(/at least one way to generate/)
+    production({ BYOK_ENCRYPTION_KEY: "dG9vLXNob3J0" })
+    expect(() => env()).toThrow(/BYOK_ENCRYPTION_KEY must be 32 bytes/)
   })
 })

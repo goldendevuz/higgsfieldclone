@@ -30,6 +30,8 @@ export interface GenerationView {
   modelLabel: string
   /** Provider; OpenRouter jobs have no cancel endpoint, so the tile hides Cancel. */
   platform: ModelPlatform
+  /** "user" = ran on the account's own provider key (no credits charged). */
+  keySource: "user" | "server"
   prompt: string
   settings: Record<string, unknown>
   media: { role: MediaRole; kind: MediaKind; url: string; name?: string }[]

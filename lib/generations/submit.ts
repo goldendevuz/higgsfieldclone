@@ -30,6 +30,7 @@ import {
   platformOfDoc,
   type GenerationDoc,
 } from "@/lib/db/collections"
+import { redactSecrets } from "@/lib/byok/keys"
 import { env } from "@/lib/env"
 import {
   AmbiguousSubmitError,
@@ -40,7 +41,6 @@ import {
 import { describePlatformError } from "@/lib/higgsfield/errors"
 import { webhookUrlFor } from "@/lib/higgsfield/webhook"
 import {
-  openrouter,
   OpenRouterError,
   OpenRouterNotConfiguredError,
 } from "@/lib/openrouter/client"
@@ -49,6 +49,13 @@ import { InlineMediaError, withSendableMedia } from "@/lib/openrouter/media"
 import { openRouterCallbackUrlFor } from "@/lib/openrouter/webhook"
 import { enforceRateLimit, LIMITS } from "@/lib/rate-limit"
 
+import {
+  chooseKeySource,
+  describeUserKeyFailure,
+  higgsfieldFor,
+  needsKeyMessage,
+  openrouterFor,
+} from "./credentials"
 import { resolveOwnedMedia } from "./media"
 import { toGenerationView } from "./serialize"
 import type { GenerationView } from "./view"
@@ -164,12 +171,17 @@ export async function submitGeneration(
   const model = findModel(input.modelId)
   if (!model) throw new UserFacingError("Unknown model.", "UNKNOWN_MODEL")
   const pricing = await pricingContext()
-  if (pricing.disabled.has(model.id) || pricing.unavailable.has(model.id))
+  if (pricing.disabled.has(model.id))
     throw new UserFacingError(
       "This model is currently unavailable.",
       "MODEL_DISABLED"
     )
   const platform = platformOf(model)
+  // The user's own key for this provider wins (they pay the provider, not us);
+  // else the server key; else the model is inactive for this user.
+  const keySource = await chooseKeySource(user.objectId, platform)
+  if (!keySource) throw new UserFacingError(needsKeyMessage(model), "NEEDS_KEY")
+  const ownKey = keySource === "user"
 
   const media = await resolveOwnedMedia(user.objectId, input.media)
   let plane: GenerationPlane
@@ -199,10 +211,13 @@ export async function submitGeneration(
     )
   const quote = quoteRequest(request, media, pricing.credits)
   const priceUsd = usdForRequest(usdRule, request, media, quote.units)
-  if (platform === "higgsfield")
+  // Higgsfield's estimate guard protects our margin, which a user's own key
+  // doesn't involve (and the estimate call needs the server key).
+  if (platform === "higgsfield" && !ownKey)
     await guardPrice(model.id, request.path, request.body, priceUsd)
-  else {
-    // OpenRouter has no estimate endpoint, so the guard is our own per-run cap.
+  if (platform === "openrouter") {
+    // OpenRouter has no estimate endpoint, so the guard is our own per-run cap;
+    // it protects a user's own money on their own key just the same.
     const cap = env().OPENROUTER_MAX_USD_PER_RUN
     if (cap > 0 && priceUsd > cap)
       throw new UserFacingError(
@@ -235,6 +250,7 @@ export async function submitGeneration(
     modelId: model.id,
     modelLabel: model.label,
     platform,
+    keySource,
     modelPath: request.path,
     requestBody: request.body,
     prompt: plane.prompt.text,
@@ -246,18 +262,22 @@ export async function submitGeneration(
       ...(name ? { name } : {}),
     })),
     status: "pending_submit",
-    cost: quote.credits,
+    // On the user's own key nothing is charged in credits.
+    cost: ownKey ? 0 : quote.credits,
     costSplit: { subscription: 0, topup: 0 },
     refunded: 0,
     priceUsd,
     billing: {
       units: quote.units,
       provisional: quote.provisional,
-      creditsPerUnit: creditRule.credits * factorFor(creditRule, request.body),
+      creditsPerUnit: ownKey
+        ? 0
+        : creditRule.credits * factorFor(creditRule, request.body),
       unitScale: quote.unitScale,
       unitOffset: quote.unitOffset,
-      extraCredits:
-        (creditRule.perItem?.credits ?? 0) * extraItems(creditRule, media),
+      extraCredits: ownKey
+        ? 0
+        : (creditRule.perItem?.credits ?? 0) * extraItems(creditRule, media),
     },
     outputs: [],
     aspect: aspectOf(plane.settings),
@@ -290,12 +310,13 @@ export async function submitGeneration(
         )
       // The debit writes the user document, so concurrent submits for one
       // user conflict and serialize: balance and concurrency stay exact.
-      doc.costSplit = await debitGeneration(
-        user.objectId,
-        generationId,
-        doc.cost,
-        session
-      )
+      if (!ownKey)
+        doc.costSplit = await debitGeneration(
+          user.objectId,
+          generationId,
+          doc.cost,
+          session
+        )
       await generations.insertOne(doc, { session })
     })
   } catch (caught) {
@@ -316,28 +337,33 @@ export async function submitGeneration(
 type Accepted = { requestId: string; status: string }
 
 async function submitToHiggsfield(doc: GenerationDoc): Promise<Accepted> {
-  const queued = await higgsfield().submit(
-    doc.modelPath,
-    doc.requestBody,
-    webhookUrlFor(doc._id.toHexString())
-  )
+  const queued = await (
+    await higgsfieldFor(doc)
+  ).submit(doc.modelPath, doc.requestBody, webhookUrlFor(doc._id.toHexString()))
   return { requestId: queued.requestId, status: queued.status }
 }
 
 async function submitToOpenRouter(doc: GenerationDoc): Promise<Accepted> {
   // Local images are inlined here, for this request only (never stored).
   const body = await withSendableMedia(doc.requestBody)
-  const job = await openrouter().submit(
-    body,
-    openRouterCallbackUrlFor(doc._id.toHexString())
-  )
+  const job = await (
+    await openrouterFor(doc)
+  ).submit(body, openRouterCallbackUrlFor(doc._id.toHexString()))
   return { requestId: job.id, status: job.status }
 }
 
-function describeSubmitError(caught: unknown): {
+function describeSubmitError(
+  caught: unknown,
+  doc: GenerationDoc
+): {
   message: string
   operatorAlert?: string
 } {
+  if (doc.keySource === "user") {
+    // The user's own key: words about their key, never an operator alert.
+    const text = describeUserKeyFailure(platformOfDoc(doc), caught)
+    if (text) return { message: text }
+  }
   if (caught instanceof PlatformNotConfiguredError)
     return { message: "Generation isn't configured on this server yet." }
   if (caught instanceof OpenRouterNotConfiguredError)
@@ -380,12 +406,12 @@ export async function sendToPlatform(
       )
       return doc
     }
-    const described = describeSubmitError(caught)
+    const described = describeSubmitError(caught, doc)
     if ("operatorAlert" in described && described.operatorAlert)
       console.error(`[submit] OPERATOR ALERT: ${described.operatorAlert}`)
     if (caught instanceof PlatformError || caught instanceof OpenRouterError)
       console.warn(
-        `[submit] platform rejected ${doc.modelPath}: ${caught.status} ${caught.message}`
+        `[submit] platform rejected ${doc.modelPath} (${doc.keySource ?? "server"} key): ${caught.status} ${redactSecrets(caught.message)}`
       )
     await generations.updateOne(
       { _id: id, status: "pending_submit" },
@@ -394,7 +420,9 @@ export async function sendToPlatform(
           status: "failed",
           errorKind: "submit",
           error: `${described.message.replace(/\.?$/, ".")}${
-            described.message.includes("refunded") ? "" : " Credits refunded."
+            doc.keySource === "user" || described.message.includes("refunded")
+              ? ""
+              : " Credits refunded."
           }`,
           finishedAt: new Date(),
           updatedAt: new Date(),

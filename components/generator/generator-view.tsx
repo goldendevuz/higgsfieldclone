@@ -107,7 +107,7 @@ function ImageLayout({ generator }: { generator: Generator }) {
             }
             prompt={generator.prompt}
             onPromptChange={generator.setPrompt}
-            cost={generator.quote?.credits}
+            cost={generator.billedToKey ? "your key" : generator.quote?.credits}
             onGenerate={() => void generator.generate()}
             onCancel={() => undefined}
             generating={false}

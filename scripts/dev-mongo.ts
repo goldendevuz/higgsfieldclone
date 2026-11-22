@@ -8,12 +8,13 @@ import { join } from "node:path"
 
 import { MongoMemoryReplSet } from "mongodb-memory-server"
 
-const dbPath = join(process.cwd(), ".data", "mongo")
+const dbPath =
+  process.env.MONGO_DB_PATH ?? join(process.cwd(), ".data", "mongo")
 mkdirSync(dbPath, { recursive: true })
 
 const replSet = await MongoMemoryReplSet.create({
   replSet: { count: 1, storageEngine: "wiredTiger", name: "vireo" },
-  instanceOpts: [{ port: 27027, dbPath }],
+  instanceOpts: [{ port: Number(process.env.MONGO_PORT ?? 27027), dbPath }],
 })
 console.log(
   `\nMongoDB replica set ready\n  MONGODB_URI=${replSet.getUri()}\n  data: ${dbPath}\n\nCtrl+C to stop.`

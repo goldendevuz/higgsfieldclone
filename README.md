@@ -72,6 +72,7 @@ reconciler runs in-process every 5 s because there is no cron or webhook tunnel.
 | Resend | `AUTH_RESEND_KEY`, `EMAIL_FROM` | Verify the sending domain first. |
 | Higgsfield | `HF_API_BASE_URL=https://api.higgsfield.ai`, `HF_CREDENTIALS=key_id:key_secret` | Keys from [console.higgsfield.ai](https://console.higgsfield.ai). Then run `pnpm pricing:sync`. Optional if OpenRouter is set. |
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_API_BASE_URL` (default `https://openrouter.ai/api/v1`) | Key from [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys); needs credits. Optional if Higgsfield is set. |
+| Own keys (BYOK) | `BYOK_ENCRYPTION_KEY` (32 bytes, base64: `openssl rand -base64 32`) | Lets signed-in users store their own OpenRouter / Higgsfield key at `/account/keys`, encrypted at rest (AES-256-GCM). Optional; without it the page says keys can't be saved. |
 | Webhooks | `HF_WEBHOOK_SECRET`, `HF_WEBHOOK_BASE_URL` (OpenRouter: `OPENROUTER_WEBHOOK_SECRET`, `OPENROUTER_WEBHOOK_BASE_URL`, each falling back to the HF value) | Public HTTPS origin. Locally: `cloudflared tunnel --url http://localhost:3000` and put the URL here. Without it the reconciler finishes runs by polling. |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` | Create 6 recurring prices (3 plans × month/year) and 3 one-time top-up prices. |
 | R2 | `R2_*` | Public bucket or custom domain for `R2_PUBLIC_BASE_URL`; CORS: allow GET from your origin. |
@@ -100,6 +101,28 @@ Endpoints with no verified price are not sold on the live API until an admin
 sets one in **Admin → Models & pricing**, and a price guard compares each
 submit against the live estimate (`HF_PRICE_GUARD`). Details:
 `docs/runbook.md` → Pricing.
+
+## Your own keys (BYOK)
+
+Signed-in users can connect their own **OpenRouter** key and/or **Higgsfield**
+credentials (`key_id:key_secret`) under **Account → API keys** (`/account/keys`).
+For a model of a provider where the user has their own key, the job runs with
+that key, **no credits are charged** (the provider bills the user; the tile says
+"Billed to your key"), and the stored key is used for every later call on that
+job (status, download, cancel). Without a key of their own, the server key and
+credits work as before; with neither, the model shows in the picker's
+**Inactive: connect your key** section (greyed, with its "from ✦N" price and a
+**Connect key** button). Higgsfield models without a verified price are not
+listed there.
+
+* Keys are validated on save (OpenRouter: `GET /key`; Higgsfield: format only,
+  its docs describe no read-only account call), encrypted with
+  `BYOK_ENCRYPTION_KEY`, shown only as the last four characters, and never sent
+  back to the browser. Saving is rate limited (10 per hour per user).
+* `OPENROUTER_MAX_USD_PER_RUN` still applies to runs on a user's key.
+* Deleting a key does not cancel runs already started on it: they can't be
+  followed any more and end as failed (nothing was charged in credits).
+* Generate a dev value: `openssl rand -base64 32` into `.env.local`.
 
 ## OpenRouter: video on a small budget
 

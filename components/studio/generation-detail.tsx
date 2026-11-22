@@ -28,6 +28,8 @@ export interface GenerationDetail {
   settings?: Record<string, unknown>
   /** Credits this generation cost (net of refunds). */
   cost?: number
+  /** Ran on the account's own provider key: no credits were charged. */
+  ownKey?: boolean
   author?: { name: string; image?: string }
 }
 
@@ -57,7 +59,9 @@ function defaultRows(g: GenerationDetail): GenerationDetailRow[] {
         typeof value === "boolean" ? (value ? "On" : "Off") : String(value),
     })
   }
-  if (typeof g.cost === "number")
+  if (g.ownKey)
+    rows.push({ id: "cost", label: "Cost", value: "Billed to your key" })
+  else if (typeof g.cost === "number")
     rows.push({ id: "cost", label: "Cost", value: `✦ ${g.cost}` })
   if (g.createdAt)
     rows.push({

@@ -291,3 +291,31 @@ duration overshoot as token prices. Resolution mapping for sizes now picks the
 run of resolutions nearest each ratio's nominal short side (Seedance 2.0's 9:21
 lists only 720p of four). `duration_seconds*` is read as USD per second (the
 docs state no unit). HeyGen, edit/upscale and Aleph 2 are skipped.
+
+## Bring your own key (BYOK, Nov 2026)
+
+* **Per user, per provider.** A signed-in user may store an OpenRouter key and/or
+  Higgsfield credentials (`user_keys`, AES-256-GCM, key `BYOK_ENCRYPTION_KEY`,
+  associated data `userId|provider`). Only `last4` ever reaches the browser. The
+  feature is off (the page says so) when the env var is missing.
+* **Billing.** If the user has their own key for the model's platform it wins:
+  the job runs on it and **no credits are charged** (`cost: 0`, no ledger rows,
+  `keySource: "user"`); otherwise the server key and credits as before; with
+  neither the model is inactive (`NEEDS_KEY`; shown in the picker's "Inactive:
+  connect your key" section). The server never mixes: one job, one key.
+* **Same key afterwards.** Status, download, cancel and reconcile build their
+  client from the generation's `userId` + `keySource` (`lib/generations/credentials.ts`).
+  A deleted or unreadable key ends the job as failed (`key_gone`) with a safe
+  message and **no credit movement**, never a fallback to the server key or to
+  another user's key. Webhooks carry no key; they only trigger a re-fetch.
+* **Guards that stay.** The per-run USD cap applies to user keys (their money).
+  Higgsfield's estimate guard is skipped for user keys (it protects our margin
+  and needs the server key). Concurrency limits and submit idempotency are
+  unchanged. Saving is rate limited (10/h/user).
+* **Higgsfield validation is format-only:** no read-only account or credits
+  endpoint is documented in the repo's docs, and `estimate`/`submit` are not
+  harmless probes. OpenRouter keys are checked with `GET /key`.
+* **Expand prompt** keeps using the server key only; it is not billed to a user key.
+* **Inactive models.** Models of a provider with no usable key are listed greyed
+  with their verified "from ✦N" price. Higgsfield models whose price is a
+  placeholder are not advertised. Tabs with no usable model are hidden.

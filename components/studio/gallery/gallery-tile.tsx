@@ -290,7 +290,10 @@ function GalleryTileComponent({
           createdAt: item.createdAt,
           settings: item.settings,
           ...(item.generation
-            ? { cost: item.generation.cost - item.generation.refunded }
+            ? {
+                cost: item.generation.cost - item.generation.refunded,
+                ownKey: item.generation.keySource === "user",
+              }
             : {}),
         }}
         actions={itemActions}

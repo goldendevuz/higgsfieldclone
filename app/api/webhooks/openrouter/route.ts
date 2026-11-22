@@ -1,4 +1,4 @@
-import { env, openRouterWebhookSecret, providersConfigured } from "@/lib/env"
+import { env, openRouterWebhookSecret } from "@/lib/env"
 import { acceptProviderWebhook } from "@/lib/generations/webhook"
 import { asRecord } from "@/lib/higgsfield/client"
 import { json } from "@/lib/http"
@@ -23,11 +23,8 @@ export async function POST(request: Request) {
   const gid = url.searchParams.get("gid") ?? ""
   const token = url.searchParams.get("t") ?? ""
   const secret = openRouterWebhookSecret(env())
-  if (
-    !providersConfigured().openrouter ||
-    !secret ||
-    !verifyOpenRouterWebhookToken(gid, token, secret)
-  )
+  // No dependence on the server key: jobs on a user's own key call back too.
+  if (!secret || !verifyOpenRouterWebhookToken(gid, token, secret))
     return json({ error: "Invalid webhook token" }, 401)
 
   const envelope = asRecord(await request.json().catch(() => null))

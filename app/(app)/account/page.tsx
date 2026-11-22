@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { CreditCard, Sparkle } from "lucide-react"
+import { CreditCard, KeyRound, Sparkle } from "lucide-react"
 
 import { LedgerTable } from "@/components/account/ledger-table"
 import { getAccount, listLedger } from "@/lib/account"
@@ -71,6 +71,12 @@ export default async function AccountPage() {
           ) : null}
         </div>
         <div className="flex gap-2">
+          <Link
+            href="/account/keys"
+            className="flex h-10 items-center gap-2 rounded-[10px] bg-white/5 px-4 text-sm font-medium hover:bg-white/10"
+          >
+            <KeyRound className="size-4" /> API keys
+          </Link>
           <Link
             href="/account/billing"
             className="flex h-10 items-center gap-2 rounded-[10px] bg-white/5 px-4 text-sm font-medium hover:bg-white/10"

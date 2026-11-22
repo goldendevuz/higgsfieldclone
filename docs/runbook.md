@@ -73,6 +73,29 @@ the provider URL. If the copy keeps failing the run stays in flight and is
 retried every reconciler pass; after four attempts the signed key-less `urls`
 from the job are used as a temporary fallback until the copy succeeds.
 
+### Users' own keys (BYOK)
+
+`/account/keys` stores a user's own OpenRouter / Higgsfield key in `user_keys`
+(`{userId, provider, ciphertext, iv, tag, last4, verified, createdAt, lastUsedAt}`,
+unique on `{userId, provider}`; `pnpm db:init` creates the index). The key is
+AES-256-GCM encrypted with `BYOK_ENCRYPTION_KEY` and bound to its owner as
+associated data.
+
+* A generation records `keySource: "user" | "server"` (missing = server). User-key
+  jobs have `cost: 0` and no ledger rows; submit, finalize, reconcile, webhook,
+  cancel and downloads resolve the key from the generation's own `userId`, never
+  the server key and never another user's key.
+* If the key is deleted (or `BYOK_ENCRYPTION_KEY` changed) while a job runs,
+  finalize ends it as `failed` with a safe message and no credit movement
+  (`finalize` outcome `key_gone`). Reconnecting does not revive a failed job.
+* Rotating `BYOK_ENCRYPTION_KEY` invalidates every stored key (users reconnect);
+  there is no re-encryption path. Set it before launch and keep it stable.
+* Provider failures on a user key (401/402/403) are shown to that user in words
+  about their key and are **not** operator alerts.
+* The OpenRouter webhook no longer depends on `OPENROUTER_API_KEY` being set, so
+  a deployment may run on users' keys alone (`BYOK_ENCRYPTION_KEY` set, no
+  provider keys).
+
 ### Platform errors in logs
 
 | Log | Meaning | Action |
@@ -168,6 +191,7 @@ item from Community and blocks re-publishing; **Dismiss** closes the reports.
 | `HF_WEBHOOK_SECRET` | In-flight runs' webhook tokens stop verifying; the reconciler finishes them. |
 | `HF_CREDENTIALS` | Create the new key in the console first, deploy, then revoke the old key. |
 | `OPENROUTER_API_KEY` | Create the new key at openrouter.ai/settings/keys first, deploy, then delete the old one. |
+| `BYOK_ENCRYPTION_KEY` | Not rotatable in place: a new value makes every stored user key unreadable (affected runs fail, users reconnect). Generate once per environment. |
 | `OPENROUTER_WEBHOOK_SECRET` | In-flight OpenRouter runs' callback URLs stop verifying; the reconciler finishes them. |
 | `STRIPE_WEBHOOK_SECRET` | Roll in the Stripe dashboard; Stripe retries failed deliveries. |
 | `CRON_SECRET` | Update in Vercel; Vercel Cron sends the new value automatically. |
@@ -182,7 +206,7 @@ item from Community and blocks re-publishing; **Dismiss** closes the reports.
 
 ## Launch checklist
 
-- [ ] Every `(required)` variable in `.env.example` set in Production, and at least one provider (`HF_CREDENTIALS` and/or `OPENROUTER_API_KEY`).
+- [ ] Every `(required)` variable in `.env.example` set in Production, and at least one way to generate (`HF_CREDENTIALS`, `OPENROUTER_API_KEY`, and/or `BYOK_ENCRYPTION_KEY` for users' own keys).
 - [ ] OpenRouter only: credits added, `pnpm smoke:openrouter mini --yes` run once, `OPENROUTER_MAX_USD_PER_RUN` set to taste.
 - [ ] `pnpm db:init` against the production database.
 - [ ] `pnpm pricing:sync` with the live key; no placeholder prices in admin.

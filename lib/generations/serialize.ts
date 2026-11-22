@@ -1,6 +1,7 @@
 import "server-only"
 
 import {
+  keySourceOf,
   platformOfDoc,
   type GenerationDoc,
   type ProjectDoc,
@@ -16,6 +17,7 @@ export function toGenerationView(doc: GenerationDoc): GenerationView {
     modelId: doc.modelId,
     modelLabel: doc.modelLabel,
     platform: platformOfDoc(doc),
+    keySource: keySourceOf(doc),
     prompt: doc.prompt,
     settings: doc.settings,
     media: doc.media.map(({ role, kind, url, name }) => ({

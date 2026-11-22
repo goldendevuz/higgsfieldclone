@@ -381,8 +381,15 @@ export function GenerateButton({
   generator: Generator
   className?: string
 }) {
-  const { quote, canGenerate, disabledReason, submitting, costWarning } =
-    generator
+  const {
+    quote,
+    canGenerate,
+    disabledReason,
+    submitting,
+    costWarning,
+    billedToKey,
+    model,
+  } = generator
   const blocked = !canGenerate
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -400,7 +407,9 @@ export function GenerateButton({
       >
         {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
         Generate
-        {quote ? (
+        {quote && billedToKey ? (
+          <span className="flex items-center gap-1 text-sm">your key</span>
+        ) : quote ? (
           <span className="flex items-center gap-1 font-mono">
             <Sparkle className="size-4 fill-current" aria-hidden />
             <span aria-label={`${quote.credits} credits`}>{quote.credits}</span>
@@ -416,6 +425,16 @@ export function GenerateButton({
           className="text-center text-xs text-muted-foreground"
         >
           {disabledReason}
+        </p>
+      ) : null}
+      {billedToKey ? (
+        <p
+          data-testid="billed-to-key"
+          className="text-center text-xs text-muted-foreground"
+        >
+          Billed to your{" "}
+          {model?.platform === "openrouter" ? "OpenRouter" : "Higgsfield"} key.
+          No credits used.
         </p>
       ) : null}
       {costWarning ? (

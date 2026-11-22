@@ -111,6 +111,8 @@ export type ClientPricing = {
   table: CreditTable
   /** Admin-disabled models plus those whose provider isn't usable by this visitor. */
   disabled: string[]
+  /** Providers where the visitor's own key applies: runs there are billed to it, not in credits. */
+  ownKeys: ModelPlatform[]
   /** Models of a provider with no key (server or the visitor's own), shown greyed with a "Connect key" nudge. */
   inactive: InactiveModel[]
   fromPrices: Record<string, number>
@@ -161,6 +163,7 @@ export async function clientPricing(
     table: context.credits,
     disabled: [...new Set([...context.disabled, ...unusable])],
     inactive,
+    ownKeys: [...own],
     fromPrices,
     expensiveCredits: Math.ceil((OPENROUTER_WARN_USD * markup) / creditUsd),
     canExpandPrompt: configured.openrouter,

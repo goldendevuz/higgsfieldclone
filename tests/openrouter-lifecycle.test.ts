@@ -651,8 +651,9 @@ describe("provider availability", () => {
     )
     expect(pricing.disabled).not.toContain("seedance-2.5")
     const user = await createUser({ topup: 500 })
+    // Without a server key the model needs the user's own key.
     await expect(submitGeneration(user, mini())).rejects.toMatchObject({
-      code: "MODEL_DISABLED",
+      code: "NEEDS_KEY",
     })
     expect(await balanceOf(user.objectId)).toEqual({
       subscription: 0,

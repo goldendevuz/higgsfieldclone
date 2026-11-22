@@ -65,6 +65,13 @@ export const TERMINAL: readonly GenerationStatus[] = [
   "canceled",
 ]
 
+export type KeySource = "user" | "server"
+
+/** The key source of a stored generation; documents without `keySource` used the server key. */
+export function keySourceOf(doc: Pick<GenerationDoc, "keySource">): KeySource {
+  return doc.keySource ?? "server"
+}
+
 /** The provider of a stored generation; old documents without `platform` are Higgsfield. */
 export function platformOfDoc(
   doc: Pick<GenerationDoc, "platform">
@@ -108,6 +115,12 @@ export interface GenerationDoc {
    * was added have no `platform` and are Higgsfield (see `platformOfDoc`).
    */
   platform?: ModelPlatform
+  /**
+   * Whose provider key ran this generation. "user" = the account's own key
+   * (BYOK): no credits were charged and every later provider call (status,
+   * download, cancel) uses that same stored key. Missing = "server".
+   */
+  keySource?: KeySource
   modelPath: string
   requestBody: Record<string, unknown>
   prompt: string
@@ -271,6 +284,27 @@ export interface ReportDoc {
   createdAt: Date
 }
 
+/**
+ * A user's own provider key (BYOK), AES-256-GCM encrypted. One per
+ * {userId, provider}. Nothing here is ever sent to the browser except `last4`.
+ */
+export interface UserKeyDoc {
+  _id: ObjectId
+  userId: ObjectId
+  provider: ModelPlatform
+  /** base64 ciphertext, 12-byte IV and 16-byte auth tag. */
+  ciphertext: string
+  iv: string
+  tag: string
+  /** Last four characters of the key, for display. */
+  last4: string
+  /** True when the provider confirmed the key with a harmless call. */
+  verified: boolean
+  createdAt: Date
+  updatedAt: Date
+  lastUsedAt?: Date
+}
+
 export interface DevMailDoc {
   _id: ObjectId
   to: string
@@ -297,6 +331,7 @@ export async function collections() {
     rateLimits: database.collection<RateLimitDoc>("rate_limits"),
     reports: database.collection<ReportDoc>("reports"),
     devMailbox: database.collection<DevMailDoc>("dev_mailbox"),
+    userKeys: database.collection<UserKeyDoc>("user_keys"),
     sessions: database.collection<{
       userId: ObjectId
       expires: Date

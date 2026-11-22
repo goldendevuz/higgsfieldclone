@@ -76,6 +76,16 @@ const schema = z.object({
     z.coerce.number().min(0).default(2)
   ),
 
+  /**
+   * 32 random bytes, base64 (`openssl rand -base64 32`): encrypts users' own
+   * provider keys at rest (AES-256-GCM). Unset = users can't store keys.
+   */
+  BYOK_ENCRYPTION_KEY: optionalString.refine(
+    (value) =>
+      value === undefined || Buffer.from(value, "base64").length === 32,
+    "BYOK_ENCRYPTION_KEY must be 32 bytes, base64 (openssl rand -base64 32)"
+  ),
+
   CREDIT_USD_VALUE: z.coerce.number().positive().default(0.01),
   CREDIT_MARKUP: z.coerce.number().min(1).default(2),
   RUN_TIMEOUT_MINUTES: z.coerce.number().int().min(5).default(30),
@@ -140,9 +150,13 @@ export function env(): Env {
     )
     // Generation needs at least one provider, and callbacks need a signing
     // secret and a public origin (each provider may use its own or HF_*).
-    if (!value.HF_CREDENTIALS && !value.OPENROUTER_API_KEY)
+    if (
+      !value.HF_CREDENTIALS &&
+      !value.OPENROUTER_API_KEY &&
+      !value.BYOK_ENCRYPTION_KEY
+    )
       missing.push(
-        "HF_CREDENTIALS or OPENROUTER_API_KEY (at least one provider)"
+        "HF_CREDENTIALS, OPENROUTER_API_KEY or BYOK_ENCRYPTION_KEY (at least one way to generate)"
       )
     if (value.HF_CREDENTIALS) {
       if (!value.HF_WEBHOOK_SECRET) missing.push("HF_WEBHOOK_SECRET")
@@ -170,7 +184,9 @@ export function env(): Env {
         "AUTH_RESEND_KEY unset → magic links are printed to this log",
       !value.HF_CREDENTIALS &&
         !value.OPENROUTER_API_KEY &&
-        "HF_CREDENTIALS and OPENROUTER_API_KEY unset → generation is disabled (use `pnpm mock:higgsfield` + HF_CREDENTIALS=mock:mock, or `pnpm mock:openrouter`)",
+        "HF_CREDENTIALS and OPENROUTER_API_KEY unset → generation needs users' own keys (BYOK_ENCRYPTION_KEY) or the mocks (`pnpm mock:higgsfield` + HF_CREDENTIALS=mock:mock, `pnpm mock:openrouter`)",
+      !value.BYOK_ENCRYPTION_KEY &&
+        "BYOK_ENCRYPTION_KEY unset → users can't save their own provider keys",
       !r2Configured(value) &&
         "R2 unset → media is stored under .data/media and served by /api/media",
       !value.STRIPE_SECRET_KEY &&
@@ -182,6 +198,13 @@ export function env(): Env {
   }
   cached = value
   return value
+}
+
+/** The key that encrypts users' own provider keys, or undefined when not configured. */
+export function byokEncryptionKey(value: Env = env()): Buffer | undefined {
+  return value.BYOK_ENCRYPTION_KEY
+    ? Buffer.from(value.BYOK_ENCRYPTION_KEY, "base64")
+    : undefined
 }
 
 /** Which generation providers have credentials on this deployment. */

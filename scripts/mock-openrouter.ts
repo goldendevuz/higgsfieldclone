@@ -5,6 +5,8 @@
  *   POST /api/v1/videos              → 202 {id, generation_id, polling_url, status}
  *   GET  /api/v1/videos/{id}         → pending → in_progress → completed | failed
  *   GET  /api/v1/videos/{id}/content → the MP4 (needs the Authorization header)
+ *   GET  /api/v1/key                 → 200 for keys starting "mock-", else 401 (BYOK validation)
+ *   GET  /__mock/keys                → last four characters of every key used to submit (test aid)
  *   POST /api/v1/chat/completions → a deterministic prompt expansion ("[expand-fail]" → 500)
  *   callback_url                     → POST {type: "video.generation.<status>", data}
  *
@@ -42,6 +44,8 @@ type Job = {
 }
 
 const jobs = new Map<string, Job>()
+/** Last four characters of the key used for each submit (never the key). */
+const submitKeys: string[] = []
 
 function send(res: ServerResponse, status: number, data?: unknown) {
   res.writeHead(status, { "content-type": "application/json" })
@@ -172,11 +176,25 @@ const server = createServer(async (req, res) => {
   try {
     if (!/^Bearer \S+$/.test(req.headers.authorization ?? "")) {
       // The model list is public; everything else needs the key.
-      if (!(method === "GET" && url.pathname === "/api/v1/videos/models"))
+      if (!(
+        method === "GET" &&
+        ["/api/v1/videos/models", "/__mock/keys"].includes(url.pathname)
+      ))
         return fail(res, 401, "Missing Authentication header")
     }
     if (method === "GET" && url.pathname === "/api/v1/videos/models")
       return send(res, 200, { data: [] })
+    if (method === "GET" && url.pathname === "/__mock/keys")
+      return send(res, 200, { keys: submitKeys })
+    // Like GET /key: valid for any "mock-*" key, 401 otherwise.
+    if (method === "GET" && url.pathname === "/api/v1/key") {
+      const bearer = (req.headers.authorization ?? "").slice("Bearer ".length)
+      return bearer.startsWith("mock-")
+        ? send(res, 200, {
+            data: { label: `mock-…${bearer.slice(-4)}`, limit: null, usage: 0 },
+          })
+        : fail(res, 401, "User not found.")
+    }
 
     if (method === "POST" && url.pathname === "/api/v1/chat/completions") {
       const body = JSON.parse((await readBody(req)).toString() || "{}") as {
@@ -227,6 +245,7 @@ const server = createServer(async (req, res) => {
         notified: false,
       }
       jobs.set(id, job)
+      submitKeys.push((req.headers.authorization ?? "").slice(-4))
       setTimeout(() => void notify(id, job), job.slow ? 26_500 : 6_500)
       console.log(
         `[mock] ${String(body.model)} ${String(body.resolution ?? "")} ${String(body.duration ?? "")}s → ${id}`

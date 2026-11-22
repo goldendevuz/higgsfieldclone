@@ -65,6 +65,7 @@ export async function clearDatabase(): Promise<void> {
     "stripe_events",
     "model_pricing",
     "reports",
+    "user_keys",
   ])
     await database.collection(name).deleteMany({})
   const { invalidatePricing } = await import("@/lib/billing/pricing")
@@ -122,6 +123,8 @@ export class FakeHiggsfield {
   /** Next submit response: "ok" | an HTTP status | "network" (ambiguous). */
   nextSubmit: "ok" | number | "network" = "ok"
   cdn = new Map<string, { body: Uint8Array<ArrayBuffer>; type: string }>()
+  /** Authorization header of every API call (not CDN downloads), in order. */
+  seenAuth: { url: string; authorization: string | null }[] = []
   private counter = 0
 
   complete(requestId: string, kind: "image" | "video" = "image", count = 1) {
@@ -150,6 +153,11 @@ export class FakeHiggsfield {
           : input.url
     )
     const method = init?.method ?? "GET"
+    if (url.host !== "cdn.hf.test")
+      this.seenAuth.push({
+        url: url.href,
+        authorization: new Headers(init?.headers).get("authorization"),
+      })
     if (url.host === "cdn.hf.test") {
       const file = this.cdn.get(url.href)
       if (!file) return new Response("missing", { status: 404 })
@@ -316,6 +324,8 @@ export class FakeOpenRouter {
   files = new Map<string, { body: Uint8Array<ArrayBuffer>; type: string }>()
   /** Content downloads that should fail with this status (copy-failure tests). */
   contentStatus?: number
+  /** Bearer keys the API accepts: the server key, plus any user key a test adds. */
+  acceptedKeys = new Set<string>([OR_KEY])
   private counter = 0
 
   /** Make a submitted job reach a terminal state. */
@@ -363,12 +373,15 @@ export class FakeOpenRouter {
         },
       })
     if (url.host !== "or.test") return new Response("missing", { status: 404 })
-    if (headers.get("authorization") !== `Bearer ${OR_KEY}`)
+    const bearer = (headers.get("authorization") ?? "").replace(/^Bearer /, "")
+    if (!this.acceptedKeys.has(bearer))
       return json(
         { error: { code: 401, message: "Missing Authentication header" } },
         401
       )
 
+    if (url.pathname === "/api/v1/key" && method === "GET")
+      return json({ data: { label: "test", limit: null, usage: 0 } })
     const content = url.pathname.match(/^\/api\/v1\/videos\/([^/]+)\/content$/)
     if (content && method === "GET") {
       const job = this.jobs.get(content[1]!)

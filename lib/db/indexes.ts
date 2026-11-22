@@ -77,6 +77,7 @@ export async function ensureIndexes(database: Db): Promise<string[]> {
   await add("presets.order", { active: 1, order: 1 })
   await add("model_pricing.model", { modelId: 1 }, { unique: true })
   await add("rate_limits.ttl", { expiresAt: 1 }, { expireAfterSeconds: 0 })
+  await add("user_keys.owner", { userId: 1, provider: 1 }, { unique: true })
   await add("reports.generation", { generationId: 1 })
   await add("reports.status", { status: 1, createdAt: -1 })
   await add("dev_mailbox.to", { to: 1, createdAt: -1 })
