@@ -31,26 +31,24 @@ export function openRouterSlug(path: string): string | undefined {
     : undefined
 }
 
-const RESOLUTION_LABELS: Readonly<Record<string, string>> = {
-  "480p": "480p (draft, cheapest)",
-  "720p": "720p (about 2.2x the cost)",
-  "1080p": "1080p (about 5.5x the cost)",
-}
-
 /**
- * Resolution setting for OpenRouter video models: 480p by default (the budget
- * choice), higher resolutions labelled with how much more they cost.
+ * Resolution setting for OpenRouter video models: the cheapest resolution is
+ * the default (the budget choice) and says so; the others show their name.
  */
 export function openRouterResolution(
-  values: readonly string[]
+  values: readonly string[],
+  defaultValue: string = values[0]!
 ): SettingField & { type: "enum" } {
   return {
     type: "enum",
     values,
-    default: "480p",
+    default: defaultValue,
     label: "Resolution",
     labels: Object.fromEntries(
-      values.map((value) => [value, RESOLUTION_LABELS[value] ?? value])
+      values.map((value) => [
+        value,
+        value === defaultValue ? `${value} (cheapest)` : value,
+      ])
     ),
   }
 }
@@ -82,7 +80,11 @@ function imagePart(url: string) {
  */
 export function mapOpenRouterVideo(
   plane: GenerationPlane,
-  slug: string
+  slug: string,
+  options: {
+    /** Sent as `resolution` when the model has a single fixed one (no setting). */
+    resolution?: string
+  } = {}
 ): PlatformRequest {
   assertFramesOrReferences(plane)
   const start = first(plane, "start")
@@ -103,7 +105,7 @@ export function mapOpenRouterVideo(
       model: slug,
       prompt: text,
       duration: int(plane.settings.duration),
-      resolution: plane.settings.resolution,
+      resolution: options.resolution ?? plane.settings.resolution,
       aspect_ratio: unlessAuto(plane.settings.aspectRatio),
       generate_audio:
         typeof plane.settings.generateAudio === "boolean"

@@ -56,16 +56,22 @@ for (const slug of [...slugs].sort()) {
     supported_aspect_ratios: entry.supported_aspect_ratios,
     supported_sizes: entry.supported_sizes,
     supported_durations: entry.supported_durations,
+    supported_frame_images: entry.supported_frame_images,
+    generate_audio: entry.generate_audio,
     pricing_skus: entry.pricing_skus,
   }
 }
 
 const rules = openRouterRules(parseModelSpecs(kept))
 for (const [path, rule] of Object.entries(rules)) {
-  const perSecond = Object.entries(rule.factors?.resolution ?? {})
+  const joint = rule.factors?.["resolution&generate_audio"]
+  const table = joint ?? rule.factors?.resolution ?? {}
+  const perSecond = Object.entries(table)
     .map(([name, factor]) => `${name} $${(rule.usd * factor).toFixed(4)}/s`)
     .join(" · ")
-  console.log(`${path}\n  worst-case aspect ratio: ${perSecond}`)
+  console.log(
+    `${path}\n  ${joint ? "resolution|audio" : "worst-case aspect ratio"}: ${perSecond}`
+  )
 }
 if (dryRun) {
   console.log("\n(dry run: nothing written)")

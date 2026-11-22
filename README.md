@@ -10,8 +10,10 @@ accent, generator panel, justified feeds); the brand, copy and media are ours.
 
 **Two generation providers, side by side.** Besides Higgsfield, models can run
 through [OpenRouter](https://openrouter.ai) (pay as you go, no subscription):
-**Seedance 2.5** and the cheap **Seedance 2.0 Mini** are in the picker as
-"(OpenRouter)" entries. Configure either provider, or both; a provider without
+**Seedance 2.5** and the cheap **Seedance 2.0 Mini** (plus 23 more text and
+image-to-video models: Seedance 2.0 / Fast / 2.5 Flash, Veo 3.1 family, Gemini
+Omni, Grok Imagine, Wan 3.0, HappyHorse, MiniMax H3 / Hailuo, Runway Gen-4.5,
+FLUX.3 Video, Mischief 1) are in the picker as "(OpenRouter)" entries. Configure either provider, or both; a provider without
 credentials is simply not offered. See [OpenRouter](#openrouter-video-on-a-small-budget).
 
 | Concern | Choice |
@@ -131,6 +133,17 @@ Budget protection is on by default:
   endpoint), so the Cancel button is hidden for them.
 * The server logs OpenRouter's reported `usage.cost` against the USD basis we
   charged from; an error line means the price table is too low.
+
+### More OpenRouter models
+
+Every text / image-to-video model in `GET /api/v1/videos/models` whose request
+fits the documented body and whose price comes from its `pricing_skus` is in the
+picker (ids end in `-openrouter`; see `docs/model-catalog.md` for the table and
+the skipped ones). Each starts at its cheapest listed resolution and 4 s (or the
+shortest allowed). Three price shapes: token-priced (Seedance), USD or cents per
+output second per resolution (Wan, HappyHorse, Hailuo, Grok, Runway, FLUX.3,
+Mischief, Gemini Omni), and Veo's resolution × audio table. Grok adds its
+per-input-image fee. `pnpm pricing:sync:openrouter` refreshes the list.
 
 Not offered through OpenRouter: Edit and Extend (`previous_job_id`) and audio or
 video references. See `docs/model-catalog.md` for why.

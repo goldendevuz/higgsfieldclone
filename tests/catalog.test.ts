@@ -15,6 +15,7 @@ import type {
   ModelEntry,
   PlatformRequest,
 } from "@/generation/catalog/types"
+import { OPENROUTER_VIDEO_SPECS } from "@/generation/catalog/models/openrouter-video"
 import { toPlatform } from "@/generation/to-platform"
 
 /* ── Plane builder ──────────────────────────────────────────────────────── */
@@ -636,6 +637,31 @@ const CASES: Record<string, Case[]> = {
       prompt: "",
     },
   ],
+}
+
+/* OpenRouter video models built from specs: text, frames, references. */
+for (const spec of OPENROUTER_VIDEO_SPECS) {
+  const path = `openrouter/${spec.slug}`
+  const toggles = spec.audioToggle ? { generateAudio: false } : {}
+  CASES[spec.id] = [
+    ...(spec.requireStart ? [] : [text(path)]),
+    {
+      name: "frames, auto aspect",
+      path,
+      media: spec.frames === "first-last" ? { start: 1, end: 1 } : { start: 1 },
+      settings: { aspectRatio: "auto", ...toggles },
+    },
+    ...(spec.references
+      ? [
+          {
+            name: "references",
+            path,
+            media: { reference: 2 },
+            settings: toggles,
+          },
+        ]
+      : []),
+  ]
 }
 
 function run(id: string, c: Case): PlatformRequest {

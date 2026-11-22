@@ -5,6 +5,9 @@ import type { MediaRole } from "@/generation/catalog/types"
  *
  *   usd = usd × units × Π factors[field][String(body[field])] + perItem
  *
+ * A factor field may join two body fields with "&" ("resolution&generate_audio");
+ * its keys are the two values joined by "|" ("720p|true").
+ *
  * `per: "second"` reads units from `body[field ?? "duration"]` (or
  * `defaultUnits` when the endpoint derives length from a source video);
  * `per: "output"` reads the count from `body[field ?? "batch_size"]`

@@ -278,3 +278,16 @@ overshoot (`lib/openrouter/pricing.ts`), so a 4 s Mini clip prices at about $0.1
 Seedance 2.5 at 480p a little above $0.41. Only one real sample exists: re-check with
 `pnpm smoke:openrouter seedance-2.5 --yes` and keep watching the `usage.cost` log in
 finalize.
+
+### More OpenRouter models, three price shapes (2026-11-22)
+
+The remaining text / image-to-video models in `/videos/models` are wired from one
+spec table (`generation/catalog/models/openrouter-video.ts`), and a test compares
+it with the checked-in list. `PriceRule.factors` gained a joint key
+`"resolution&generate_audio"` (values `"720p|true"`) because Veo's prices are a
+table, not a product; the rule is anchored on the dearest combination so a body
+missing either field pays the worst case. Per-second SKUs get the same 3%
+duration overshoot as token prices. Resolution mapping for sizes now picks the
+run of resolutions nearest each ratio's nominal short side (Seedance 2.0's 9:21
+lists only 720p of four). `duration_seconds*` is read as USD per second (the
+docs state no unit). HeyGen, edit/upscale and Aleph 2 are skipped.

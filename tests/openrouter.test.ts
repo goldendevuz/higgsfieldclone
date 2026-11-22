@@ -195,7 +195,7 @@ describe("OpenRouter pricing", () => {
   })
 
   it("never prices a (resolution, aspect) below its real cost", () => {
-    for (const item of specs) {
+    for (const item of specs.filter((spec) => spec.tokenUsd.default)) {
       const rule = OPENROUTER_PRICING[`openrouter/${item.slug}`]!
       const grid = perSecondGrid(item)
       for (const [resolution, row] of Object.entries(grid))

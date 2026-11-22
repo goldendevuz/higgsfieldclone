@@ -40,6 +40,131 @@ exports[`toPlatform: every model and input mode > cinema-studio-4 > text 1`] = `
 }
 `;
 
+exports[`toPlatform: every model and input mode > flux-3-video-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 5,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "black-forest-labs/flux-3-video",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/black-forest-labs/flux-3-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > flux-3-video-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 5,
+    "generate_audio": true,
+    "model": "black-forest-labs/flux-3-video",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/black-forest-labs/flux-3-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > gemini-omni-1.1-flash-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "google/gemini-omni-1.1-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "360p",
+  },
+  "path": "openrouter/google/gemini-omni-1.1-flash",
+}
+`;
+
+exports[`toPlatform: every model and input mode > gemini-omni-1.1-flash-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "google/gemini-omni-1.1-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "360p",
+  },
+  "path": "openrouter/google/gemini-omni-1.1-flash",
+}
+`;
+
+exports[`toPlatform: every model and input mode > gemini-omni-1.2-flash-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "google/gemini-omni-1.2-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "360p",
+  },
+  "path": "openrouter/google/gemini-omni-1.2-flash",
+}
+`;
+
+exports[`toPlatform: every model and input mode > gemini-omni-1.2-flash-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "google/gemini-omni-1.2-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "360p",
+  },
+  "path": "openrouter/google/gemini-omni-1.2-flash",
+}
+`;
+
 exports[`toPlatform: every model and input mode > genjutsu-motion > source with references, no prompt 1`] = `
 {
   "body": {
@@ -100,6 +225,112 @@ exports[`toPlatform: every model and input mode > grok-image-2 > text 1`] = `
     "resolution": "1k",
   },
   "path": "xai/grok-imagine-image-2.0",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-1.5-lite-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "x-ai/grok-imagine-video-1.5-lite",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video-1.5-lite",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-1.5-lite-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "x-ai/grok-imagine-video-1.5-lite",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video-1.5-lite",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-1.5-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "x-ai/grok-imagine-video-1.5",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video-1.5",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-1.5-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "x-ai/grok-imagine-video-1.5",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video-1.5",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "x-ai/grok-imagine-video",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > grok-imagine-video-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "x-ai/grok-imagine-video",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/x-ai/grok-imagine-video",
 }
 `;
 
@@ -170,6 +401,123 @@ exports[`toPlatform: every model and input mode > hailuo-2.3 > text 1`] = `
     "prompt_optimizer": true,
   },
   "path": "minimax/hailuo-2.3/standard/text-to-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-2.3-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 6,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "minimax/hailuo-2.3",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "1080p",
+  },
+  "path": "openrouter/minimax/hailuo-2.3",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-2.3-openrouter > text 1`] = `
+{
+  "body": {
+    "duration": 6,
+    "model": "minimax/hailuo-2.3",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "1080p",
+  },
+  "path": "openrouter/minimax/hailuo-2.3",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-3-max-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 5,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "minimax/hailuo-3-max",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/minimax/hailuo-3-max",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-3-max-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 5,
+    "model": "minimax/hailuo-3-max",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/minimax/hailuo-3-max",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-3-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 5,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "minimax/hailuo-3",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "2K",
+  },
+  "path": "openrouter/minimax/hailuo-3",
+}
+`;
+
+exports[`toPlatform: every model and input mode > hailuo-3-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 5,
+    "generate_audio": true,
+    "model": "minimax/hailuo-3",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "2K",
+  },
+  "path": "openrouter/minimax/hailuo-3",
 }
 `;
 
@@ -254,6 +602,74 @@ exports[`toPlatform: every model and input mode > happy-horse-1.1 > text 1`] = `
     "resolution": "1080p",
   },
   "path": "alibaba/happy-horse/v1.1/text-to-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > happy-horse-1.1-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "alibaba/happyhorse-1.1",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/alibaba/happyhorse-1.1",
+}
+`;
+
+exports[`toPlatform: every model and input mode > happy-horse-1.1-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "alibaba/happyhorse-1.1",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/alibaba/happyhorse-1.1",
+}
+`;
+
+exports[`toPlatform: every model and input mode > happy-horse-1-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "alibaba/happyhorse-1.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/alibaba/happyhorse-1.0",
+}
+`;
+
+exports[`toPlatform: every model and input mode > happy-horse-1-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "alibaba/happyhorse-1.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/alibaba/happyhorse-1.0",
 }
 `;
 
@@ -901,6 +1317,27 @@ exports[`toPlatform: every model and input mode > minimax-h3 > text 1`] = `
 }
 `;
 
+exports[`toPlatform: every model and input mode > mischief-1-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 3,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "tbc/mischief-1",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/tbc/mischief-1",
+}
+`;
+
 exports[`toPlatform: every model and input mode > pixverse-v6 > frames 1`] = `
 {
   "body": {
@@ -1020,6 +1457,40 @@ exports[`toPlatform: every model and input mode > recraft-4.1 > utility 2k 1`] =
 }
 `;
 
+exports[`toPlatform: every model and input mode > runway-gen-4.5-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "runway/gen-4.5",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/runway/gen-4.5",
+}
+`;
+
+exports[`toPlatform: every model and input mode > runway-gen-4.5-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "model": "runway/gen-4.5",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/runway/gen-4.5",
+}
+`;
+
 exports[`toPlatform: every model and input mode > seedance-2 > frames 1`] = `
 {
   "body": {
@@ -1077,6 +1548,77 @@ exports[`toPlatform: every model and input mode > seedance-2 > text 1`] = `
     "resolution": "720p",
   },
   "path": "bytedance/seedance-2.0/text-to-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-fast-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "bytedance/seedance-2.0-fast",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0-fast",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-fast-openrouter > references 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": false,
+    "input_references": [
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-1.jpg",
+        },
+        "type": "image_url",
+      },
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-2.jpg",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "bytedance/seedance-2.0-fast",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0-fast",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-fast-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "bytedance/seedance-2.0-fast",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0-fast",
 }
 `;
 
@@ -1149,6 +1691,77 @@ exports[`toPlatform: every model and input mode > seedance-2.0-mini-openrouter >
     "resolution": "480p",
   },
   "path": "openrouter/bytedance/seedance-2.0-mini",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "bytedance/seedance-2.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-openrouter > references 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": false,
+    "input_references": [
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-1.jpg",
+        },
+        "type": "image_url",
+      },
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-2.jpg",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "bytedance/seedance-2.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.0-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "bytedance/seedance-2.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.0",
 }
 `;
 
@@ -1239,6 +1852,77 @@ exports[`toPlatform: every model and input mode > seedance-2.5-extend > source 1
     "video_url": "https://media.example.com/source-1.mp4",
   },
   "path": "bytedance/seedance-2.5/video-extend",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.5-flash-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "bytedance/seedance-2.5-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.5-flash",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.5-flash-openrouter > references 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": false,
+    "input_references": [
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-1.jpg",
+        },
+        "type": "image_url",
+      },
+      {
+        "image_url": {
+          "url": "https://media.example.com/reference-2.jpg",
+        },
+        "type": "image_url",
+      },
+    ],
+    "model": "bytedance/seedance-2.5-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.5-flash",
+}
+`;
+
+exports[`toPlatform: every model and input mode > seedance-2.5-flash-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "bytedance/seedance-2.5-flash",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/bytedance/seedance-2.5-flash",
 }
 `;
 
@@ -1404,6 +2088,135 @@ exports[`toPlatform: every model and input mode > soul-cinema > text 1`] = `
     "resolution": "720p",
   },
   "path": "higgsfield-ai/soul/cinema",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-fast-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "google/veo-3.1-fast",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1-fast",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-fast-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "google/veo-3.1-fast",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1-fast",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-lite-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "google/veo-3.1-lite",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1-lite",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-lite-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "google/veo-3.1-lite",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1-lite",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "google/veo-3.1",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1",
+}
+`;
+
+exports[`toPlatform: every model and input mode > veo-3.1-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "google/veo-3.1",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "720p",
+  },
+  "path": "openrouter/google/veo-3.1",
 }
 `;
 
@@ -1583,6 +2396,49 @@ exports[`toPlatform: every model and input mode > wan-3 > text 1`] = `
 }
 `;
 
+exports[`toPlatform: every model and input mode > wan-3-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "alibaba/wan-3.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/alibaba/wan-3.0",
+}
+`;
+
+exports[`toPlatform: every model and input mode > wan-3-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "alibaba/wan-3.0",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/alibaba/wan-3.0",
+}
+`;
+
 exports[`toPlatform: every model and input mode > wan-3-prime > references 1`] = `
 {
   "body": {
@@ -1649,6 +2505,49 @@ exports[`toPlatform: every model and input mode > wan-3-prime > text 1`] = `
     "resolution": "1080p",
   },
   "path": "alibaba/wan-3.0-prime/text-to-video",
+}
+`;
+
+exports[`toPlatform: every model and input mode > wan-3-prime-openrouter > frames, auto aspect 1`] = `
+{
+  "body": {
+    "duration": 4,
+    "frame_images": [
+      {
+        "frame_type": "first_frame",
+        "image_url": {
+          "url": "https://media.example.com/start-1.png",
+        },
+        "type": "image_url",
+      },
+      {
+        "frame_type": "last_frame",
+        "image_url": {
+          "url": "https://media.example.com/end-1.png",
+        },
+        "type": "image_url",
+      },
+    ],
+    "generate_audio": false,
+    "model": "alibaba/wan-3.0-prime",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/alibaba/wan-3.0-prime",
+}
+`;
+
+exports[`toPlatform: every model and input mode > wan-3-prime-openrouter > text 1`] = `
+{
+  "body": {
+    "aspect_ratio": "16:9",
+    "duration": 4,
+    "generate_audio": true,
+    "model": "alibaba/wan-3.0-prime",
+    "prompt": "A lighthouse keeper climbs a spiral staircase at dusk, warm lamp light, slow push-in.",
+    "resolution": "480p",
+  },
+  "path": "openrouter/alibaba/wan-3.0-prime",
 }
 `;
 
