@@ -6,9 +6,16 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Check, Search, Sparkle, X } from "lucide-react"
 
 import { useApp } from "@/components/providers/app-providers"
-import type { ModelBadge, ModelEntry } from "@/generation/catalog/types"
+import type {
+  GeneratorTab,
+  ModelBadge,
+  ModelEntry,
+  Surface,
+} from "@/generation/catalog/types"
 import { familyCover } from "@/lib/showcase"
 import { cn } from "@/lib/utils"
+
+import { InactiveModelsSection, useInactiveModels } from "./inactive-models"
 
 export function ModelIcon({
   model,
@@ -58,8 +65,13 @@ export function ModelPicker({
   onChange,
   trigger,
   title = "Choose a model",
+  surface,
+  tab,
 }: {
   models: ModelEntry[]
+  /** With `surface`, models that need a key are listed in a separate "Inactive" section. */
+  surface?: Surface
+  tab?: GeneratorTab
   value?: string
   onChange: (id: string) => void
   trigger: ReactElement
@@ -68,6 +80,8 @@ export function ModelPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const { pricing } = useApp()
+  const inactive = useInactiveModels(surface ?? "video", tab, query)
+  const inactiveShown = surface ? inactive : []
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -166,7 +180,7 @@ export function ModelPicker({
                 </div>
               </section>
             ) : null}
-            {groups.length === 0 ? (
+            {groups.length === 0 && !inactiveShown.length ? (
               <p className="py-16 text-center text-sm text-muted-foreground">
                 No models match “{query}”.
               </p>
@@ -227,6 +241,10 @@ export function ModelPicker({
                 </section>
               ))
             )}
+            <InactiveModelsSection
+              entries={inactiveShown}
+              forceOpen={query.trim().length > 0}
+            />
           </div>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>

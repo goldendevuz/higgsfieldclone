@@ -16,6 +16,10 @@ const bool = (fallback: boolean) =>
       value === undefined ? fallback : value === "true" || value === "1"
     )
 
+/** A blank variable (`NAME=`) means "use the default", not 0 (a 0 cap would switch protection off). */
+const blankIsDefault = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema)
+
 const optionalString = z
   .string()
   .optional()
@@ -56,6 +60,32 @@ const schema = z.object({
   HF_WEBHOOK_BASE_URL: optionalString,
   HF_PRICE_GUARD: bool(true),
 
+  /** OpenRouter (https://openrouter.ai/docs/api-reference/authentication): Bearer key, server-side only. */
+  OPENROUTER_API_KEY: optionalString,
+  OPENROUTER_API_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
+  /** Cheap text model for the "Expand prompt" button (default anthropic/claude-haiku-5.5). */
+  OPENROUTER_EXPAND_MODEL: optionalString,
+  /** Signs OpenRouter callback URLs; falls back to HF_WEBHOOK_SECRET. */
+  OPENROUTER_WEBHOOK_SECRET: optionalString,
+  /** Public HTTPS origin for OpenRouter callbacks; falls back to HF_WEBHOOK_BASE_URL. */
+  OPENROUTER_WEBHOOK_BASE_URL: optionalString,
+  /** Show a cost warning on OpenRouter runs priced above this many USD (our cost). */
+  OPENROUTER_WARN_USD: blankIsDefault(z.coerce.number().min(0).default(0.75)),
+  /** Refuse OpenRouter runs priced above this many USD (our cost). 0 = no cap. */
+  OPENROUTER_MAX_USD_PER_RUN: blankIsDefault(
+    z.coerce.number().min(0).default(2)
+  ),
+
+  /**
+   * 32 random bytes, base64 (`openssl rand -base64 32`): encrypts users' own
+   * provider keys at rest (AES-256-GCM). Unset = users can't store keys.
+   */
+  BYOK_ENCRYPTION_KEY: optionalString.refine(
+    (value) =>
+      value === undefined || Buffer.from(value, "base64").length === 32,
+    "BYOK_ENCRYPTION_KEY must be 32 bytes, base64 (openssl rand -base64 32)"
+  ),
+
   CREDIT_USD_VALUE: z.coerce.number().positive().default(0.01),
   CREDIT_MARKUP: z.coerce.number().min(1).default(2),
   RUN_TIMEOUT_MINUTES: z.coerce.number().int().min(5).default(30),
@@ -84,9 +114,6 @@ const REQUIRED_IN_PRODUCTION = [
   "AUTH_SECRET",
   "AUTH_RESEND_KEY",
   "MONGODB_URI",
-  "HF_CREDENTIALS",
-  "HF_WEBHOOK_SECRET",
-  "HF_WEBHOOK_BASE_URL",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "R2_ACCOUNT_ID",
@@ -118,7 +145,29 @@ export function env(): Env {
   }
   const value = parsed.data
   if (value.NODE_ENV === "production" && !isBuildPhase()) {
-    const missing = REQUIRED_IN_PRODUCTION.filter((key) => !value[key])
+    const missing: string[] = REQUIRED_IN_PRODUCTION.filter(
+      (key) => !value[key]
+    )
+    // Generation needs at least one provider, and callbacks need a signing
+    // secret and a public origin (each provider may use its own or HF_*).
+    if (
+      !value.HF_CREDENTIALS &&
+      !value.OPENROUTER_API_KEY &&
+      !value.BYOK_ENCRYPTION_KEY
+    )
+      missing.push(
+        "HF_CREDENTIALS, OPENROUTER_API_KEY or BYOK_ENCRYPTION_KEY (at least one way to generate)"
+      )
+    if (value.HF_CREDENTIALS) {
+      if (!value.HF_WEBHOOK_SECRET) missing.push("HF_WEBHOOK_SECRET")
+      if (!value.HF_WEBHOOK_BASE_URL) missing.push("HF_WEBHOOK_BASE_URL")
+    }
+    if (value.OPENROUTER_API_KEY) {
+      if (!openRouterWebhookSecret(value))
+        missing.push("OPENROUTER_WEBHOOK_SECRET (or HF_WEBHOOK_SECRET)")
+      if (!openRouterWebhookBaseUrl(value))
+        missing.push("OPENROUTER_WEBHOOK_BASE_URL (or HF_WEBHOOK_BASE_URL)")
+    }
     if (missing.length)
       throw new EnvError(
         `Missing required production environment variables:\n${missing
@@ -134,7 +183,10 @@ export function env(): Env {
       !value.AUTH_RESEND_KEY &&
         "AUTH_RESEND_KEY unset → magic links are printed to this log",
       !value.HF_CREDENTIALS &&
-        "HF_CREDENTIALS unset → generation is disabled (use `pnpm mock:higgsfield` + HF_CREDENTIALS=mock:mock)",
+        !value.OPENROUTER_API_KEY &&
+        "HF_CREDENTIALS and OPENROUTER_API_KEY unset → generation needs users' own keys (BYOK_ENCRYPTION_KEY) or the mocks (`pnpm mock:higgsfield` + HF_CREDENTIALS=mock:mock, `pnpm mock:openrouter`)",
+      !value.BYOK_ENCRYPTION_KEY &&
+        "BYOK_ENCRYPTION_KEY unset → users can't save their own provider keys",
       !r2Configured(value) &&
         "R2 unset → media is stored under .data/media and served by /api/media",
       !value.STRIPE_SECRET_KEY &&
@@ -146,6 +198,36 @@ export function env(): Env {
   }
   cached = value
   return value
+}
+
+/** The key that encrypts users' own provider keys, or undefined when not configured. */
+export function byokEncryptionKey(value: Env = env()): Buffer | undefined {
+  return value.BYOK_ENCRYPTION_KEY
+    ? Buffer.from(value.BYOK_ENCRYPTION_KEY, "base64")
+    : undefined
+}
+
+/** Which generation providers have credentials on this deployment. */
+export function providersConfigured(value: Env = env()): {
+  higgsfield: boolean
+  openrouter: boolean
+} {
+  return {
+    higgsfield: Boolean(value.HF_CREDENTIALS),
+    openrouter: Boolean(value.OPENROUTER_API_KEY),
+  }
+}
+
+export function openRouterWebhookSecret(
+  value: Env = env()
+): string | undefined {
+  return value.OPENROUTER_WEBHOOK_SECRET ?? value.HF_WEBHOOK_SECRET
+}
+
+export function openRouterWebhookBaseUrl(
+  value: Env = env()
+): string | undefined {
+  return value.OPENROUTER_WEBHOOK_BASE_URL ?? value.HF_WEBHOOK_BASE_URL
 }
 
 export function r2Configured(value: Env = env()): boolean {

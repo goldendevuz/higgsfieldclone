@@ -1,12 +1,15 @@
 # Runbook
 
 Operating Vireo in production. Everything below is idempotent unless noted.
+Generations run on Higgsfield, OpenRouter, or both; the generation's `platform`
+field says which (documents without it are Higgsfield).
 
 ## Health at a glance
 
 | Signal | Where | Healthy |
 |---|---|---|
 | Reconciler | Vercel → Cron → `/api/cron/reconcile` | 200 every minute; JSON summary with small numbers |
+| OpenRouter balance | openrouter.ai → Credits | Comfortably above a few runs; a 402 means it is empty |
 | In-flight runs | Admin → Generations → status `queued` / `in_progress` | Nothing older than `RUN_TIMEOUT_MINUTES` (30) |
 | Pending submits | Admin → Generations → `pending_submit` | Empty after 2 minutes |
 | Pricing | Admin → Models & pricing | No pink "placeholder" or "Reprice" badges |
@@ -20,8 +23,13 @@ Operating Vireo in production. Everything below is idempotent unless noted.
 * `failed`, `nsfw`, `canceled` and timeouts refund exactly once (ledger key
   `{reason, refType, refId, bucket}`); the reconciler re-runs any refund that
   didn't land.
-* The webhook never trusts its payload — it re-fetches
-  `GET /requests/{id}/status`.
+* The webhook never trusts its payload — it re-fetches the status from the
+  provider that ran the job (Higgsfield `GET /requests/{id}/status`, OpenRouter
+  `GET /videos/{id}`).
+* OpenRouter status mapping: `pending` → queued, `in_progress`, `completed`,
+  `failed` and `expired` → failed (refunded once), `cancelled` → canceled.
+  `generations.hfRequestId` holds the provider's job id for either platform
+  (the field name is historical).
 
 ### A run is stuck
 
@@ -35,10 +43,58 @@ Operating Vireo in production. Everything below is idempotent unless noted.
 
 ### Ambiguous submits (`pending_submit` with no request id)
 
-The platform has no idempotency key, so timeouts/502/504 on submit are never
-retried automatically. After 2 minutes the reconciler marks them failed and
+The platforms have no idempotency key, so timeouts/502/504 on submit are never
+retried automatically (OpenRouter: also 500 and a 2xx without a job id). After 2 minutes the reconciler marks them failed and
 refunds. If a webhook for that generation arrives later, the result is attached
 and delivered free.
+
+### OpenRouter jobs cannot be canceled
+
+OpenRouter documents no cancel endpoint, so the studio hides Cancel on its jobs
+and refuses the server action. A job runs to completion or failure; a failed
+one is not billed and is refunded to the user once. If a job outlives
+`RUN_TIMEOUT_MINUTES` the reconciler fails and refunds it without any cancel
+call; should OpenRouter finish it later, the callback or the next poll still
+delivers the video free of charge (logged as "late delivery"), so that run costs
+us the provider fee. Keep the timeout generous.
+
+### Prompt expansion cost
+
+`POST /api/prompt/expand` is free for users (no ledger entry) but costs us a fraction
+of a cent per call on OpenRouter; each call logs `[expand] user … cost $…`. It is
+rate limited to 20 per user per hour (`LIMITS.expandPerUser`).
+
+### OpenRouter downloads
+
+The finished video is fetched server-side with `Authorization: Bearer
+$OPENROUTER_API_KEY` from the `unsigned_urls` (the key is sent only to the
+configured API origin) and streamed into R2; the browser never sees the key or
+the provider URL. If the copy keeps failing the run stays in flight and is
+retried every reconciler pass; after four attempts the signed key-less `urls`
+from the job are used as a temporary fallback until the copy succeeds.
+
+### Users' own keys (BYOK)
+
+`/account/keys` stores a user's own OpenRouter / Higgsfield key in `user_keys`
+(`{userId, provider, ciphertext, iv, tag, last4, verified, createdAt, lastUsedAt}`,
+unique on `{userId, provider}`; `pnpm db:init` creates the index). The key is
+AES-256-GCM encrypted with `BYOK_ENCRYPTION_KEY` and bound to its owner as
+associated data.
+
+* A generation records `keySource: "user" | "server"` (missing = server). User-key
+  jobs have `cost: 0` and no ledger rows; submit, finalize, reconcile, webhook,
+  cancel and downloads resolve the key from the generation's own `userId`, never
+  the server key and never another user's key.
+* If the key is deleted (or `BYOK_ENCRYPTION_KEY` changed) while a job runs,
+  finalize ends it as `failed` with a safe message and no credit movement
+  (`finalize` outcome `key_gone`). Reconnecting does not revive a failed job.
+* Rotating `BYOK_ENCRYPTION_KEY` invalidates every stored key (users reconnect);
+  there is no re-encryption path. Set it before launch and keep it stable.
+* Provider failures on a user key (401/402/403) are shown to that user in words
+  about their key and are **not** operator alerts.
+* The OpenRouter webhook no longer depends on `OPENROUTER_API_KEY` being set, so
+  a deployment may run on users' keys alone (`BYOK_ENCRYPTION_KEY` set, no
+  provider keys).
 
 ### Platform errors in logs
 
@@ -47,6 +103,11 @@ and delivered free.
 | `OPERATOR ALERT: Higgsfield rejected HF_CREDENTIALS (401)` | Key revoked/rotated | Update `HF_CREDENTIALS`, redeploy |
 | `OPERATOR ALERT: Higgsfield account is out of credits (403)` | Platform balance empty | Top up the platform account |
 | `OPERATOR ALERT: Platform concurrency limit reached` | Account concurrency cap | Ask Higgsfield for higher limits; lower plan concurrency |
+| `OPERATOR ALERT: OpenRouter rejected OPENROUTER_API_KEY (401)` | Key revoked/rotated | Update `OPENROUTER_API_KEY`, redeploy |
+| `OPERATOR ALERT: OpenRouter account is out of credits (402)` | OpenRouter balance empty | Add credits at openrouter.ai/credits; users see "temporarily unavailable" and are refunded |
+| `OPERATOR ALERT: OpenRouter refused the key for prompt expansion (401/403)` | Key revoked, or the workspace budget is used up (403 "budget exceeded") | Fix the key/budget; the Expand button then shows "temporarily unavailable" and nothing else is affected |
+| `OPERATOR ALERT: OPENROUTER_EXPAND_MODEL is not available` | Model slug retired | Set `OPENROUTER_EXPAND_MODEL` to a live text model (a `:free` one works as a fallback) |
+| `[pricing] provider cost above our price basis` | OpenRouter billed more than our table | Run `pnpm pricing:sync:openrouter`; check the token formula in `lib/openrouter/pricing.ts` |
 | `[pricing] live cost … exceeds our price basis` | Price table stale | Admin → Models & pricing, or `pnpm pricing:sync` |
 
 ## Pricing
@@ -71,6 +132,38 @@ and delivered free.
 * Per-endpoint overrides: Admin → Models & pricing → ✎. Takes effect within 30 s.
 * The price guard blocks a submit only when the live cost is > 25 % above our
   basis (and flags the model at > 1 %).
+
+### OpenRouter pricing
+
+* `pnpm pricing:sync:openrouter` (no key needed) rewrites
+  `lib/openrouter/models.generated.json` from the public
+  `GET /api/v1/videos/models`; the rules in `lib/openrouter/pricing.ts` are
+  derived from it: USD per video token × tokens per second
+  (`width × height × 24 / 1024`) at each listed size, rounded **up** to the
+  worst case so a price is never below the real cost. Commit the JSON.
+* The token formula is an assumption carried over from Seedance's published
+  billing; it matches the per-second figures we were given for Seedance 2.5.
+  The first real run proves it: the server logs `provider billed $X, our basis
+  $Y` at finalize, and `generations.providerCostUsd` keeps X.
+* Budget limits: `OPENROUTER_WARN_USD` (UI warning, default 0.75) and
+  `OPENROUTER_MAX_USD_PER_RUN` (refuse above, default 2, `0` = off).
+* There is no Higgsfield-style price guard for OpenRouter (no estimate endpoint).
+
+### First real OpenRouter run (smoke test)
+
+Spends real money, one job per command, nothing is sent without `--yes`:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-v1-...        # not committed; or in .env.local
+pnpm smoke:openrouter mini                    # dry run: prints model, 4 s, 480p, estimate
+pnpm smoke:openrouter mini --yes              # Seedance 2.0 Mini, 4 s, 480p (about $0.14)
+pnpm smoke:openrouter seedance-2.5 --yes      # optional: Seedance 2.5, 4 s, 480p (about $0.41)
+```
+
+It polls the job, downloads the MP4 with the key into `.data/smoke/`, and prints
+`usage.cost` against our estimate ("within our price basis" or an error to fix).
+Then check the callback path on a deployed URL (`OPENROUTER_WEBHOOK_*` set):
+generate once in the app and confirm the log line `POST /api/webhooks/openrouter`.
 
 ## Credits and billing
 
@@ -97,6 +190,9 @@ item from Community and blocks re-publishing; **Dismiss** closes the reports.
 | `AUTH_SECRET` | Rotating signs everyone out (database sessions stay, cookies become invalid). |
 | `HF_WEBHOOK_SECRET` | In-flight runs' webhook tokens stop verifying; the reconciler finishes them. |
 | `HF_CREDENTIALS` | Create the new key in the console first, deploy, then revoke the old key. |
+| `OPENROUTER_API_KEY` | Create the new key at openrouter.ai/settings/keys first, deploy, then delete the old one. |
+| `BYOK_ENCRYPTION_KEY` | Not rotatable in place: a new value makes every stored user key unreadable (affected runs fail, users reconnect). Generate once per environment. |
+| `OPENROUTER_WEBHOOK_SECRET` | In-flight OpenRouter runs' callback URLs stop verifying; the reconciler finishes them. |
 | `STRIPE_WEBHOOK_SECRET` | Roll in the Stripe dashboard; Stripe retries failed deliveries. |
 | `CRON_SECRET` | Update in Vercel; Vercel Cron sends the new value automatically. |
 
@@ -110,7 +206,8 @@ item from Community and blocks re-publishing; **Dismiss** closes the reports.
 
 ## Launch checklist
 
-- [ ] Every `(required)` variable in `.env.example` set in Production.
+- [ ] Every `(required)` variable in `.env.example` set in Production, and at least one way to generate (`HF_CREDENTIALS`, `OPENROUTER_API_KEY`, and/or `BYOK_ENCRYPTION_KEY` for users' own keys).
+- [ ] OpenRouter only: credits added, `pnpm smoke:openrouter mini --yes` run once, `OPENROUTER_MAX_USD_PER_RUN` set to taste.
 - [ ] `pnpm db:init` against the production database.
 - [ ] `pnpm pricing:sync` with the live key; no placeholder prices in admin.
 - [ ] Final plan prices and credit allowances in `lib/billing/plans.ts`; Stripe prices match.

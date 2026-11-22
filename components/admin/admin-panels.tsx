@@ -453,6 +453,7 @@ const SOURCE_LABEL: Record<PriceRule["source"], string> = {
   estimate: "estimate",
   description: "from pricing text",
   admin: "admin",
+  openrouter: "OpenRouter list",
 }
 
 export function AdminModels({

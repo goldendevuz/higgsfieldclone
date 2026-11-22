@@ -83,6 +83,57 @@ Newest decisions go at the bottom of each section.
   every service key, development allows the documented fallbacks and prints
   one warning line per fallback.
 
+## OpenRouter as a second provider (Nov 2026)
+
+- **Both providers, side by side.** `ModelEntry.platform` (default
+  `"higgsfield"`) and `GenerationDoc.platform` (written on every new
+  generation; missing = Higgsfield, via `platformOfDoc`). Submit, finalize,
+  reconcile, webhook and cancel dispatch on it. Generation is available when at
+  least one provider is configured; models of an unconfigured provider are
+  hidden (`ClientPricing.disabled`) and refused on submit.
+- **`hfRequestId` keeps its name** and holds either provider's job id. Renaming
+  would touch the unique index, every query and all existing documents for no
+  behavioural gain; `platform` says whose id it is.
+- **Separate picker entries** (`…-openrouter`) instead of routing one Seedance
+  entry between providers: different prices, limits (no audio/video
+  references), no cancel, no Edit/Extend.
+- **Ambiguous submits.** Only 429 and 503 are retried on submit (they prove
+  nothing was created). Network errors, timeouts, 500, 502, 504 and a 2xx
+  without a job id are ambiguous, exactly like Higgsfield: no idempotency key,
+  so no retry, and the reconciler refunds after 2 minutes.
+- **Webhooks.** OpenRouter documents an `X-OpenRouter-Signature` HMAC, but only
+  when a signing secret is configured in the workspace. We keep the Higgsfield
+  design instead: a per-generation HMAC token in the callback URL (domain
+  separated from Higgsfield's) and a re-fetch of `GET /videos/{id}`; the payload
+  is never trusted, so a forged delivery can at most trigger a status check.
+  `callback_url` must be HTTPS, so callbacks are skipped for plain-http bases
+  in production. The reconciler remains the fallback.
+- **Downloads need the key**, so finalize fetches `unsigned_urls` server-side
+  with `Authorization` (sent only to the configured API origin) and streams into
+  R2. A key-protected URL is never stored; the signed `urls` are only a
+  temporary fallback after repeated copy failures.
+- **Pricing from the model list.** `usage.cost` is only known after the run and
+  there is no estimate endpoint, so prices come from `/videos/models`
+  (`video_tokens` USD per token × tokens per second, rounded up to the worst
+  aspect ratio). The token formula is an assumption, verified only against the
+  figures we were given; finalize logs `usage.cost` against the basis we
+  charged. The Higgsfield price guard is skipped for OpenRouter; instead a
+  per-run USD cap (`OPENROUTER_MAX_USD_PER_RUN`, default 2) and a UI warning
+  (`OPENROUTER_WARN_USD`, default 0.75) protect a small budget.
+  Mini at 480p is about $0.034/s (a 4 s clip ≈ $0.13), above the $0.01345/s we
+  were first given; the list's own `video_tokens` price says so.
+- **Budget defaults.** 480p and 4 s are the defaults of every OpenRouter model.
+- **Cancel.** No endpoint is documented, so none is faked: the action is refused
+  and the tile hides the button. The run timeout still refunds.
+- **Uploads without Higgsfield.** OpenRouter has no upload endpoint and wants
+  https or base64 image URLs. With no Higgsfield key, the upload ticket points
+  at our own HMAC-signed `PUT /api/upload/direct` that writes into R2 (or
+  `.data/media`). With a Higgsfield key the original flow is unchanged. Local
+  (non-https) images are inlined as data URLs for the OpenRouter request only
+  (≤ 8 MB) and never stored.
+- **`.env.example`** now ships `HF_CREDENTIALS=` empty (the old placeholder
+  would have counted as a configured provider).
+
 ## Auth
 
 - Auth.js v5, Resend provider (magic link only), MongoDB adapter, database
@@ -217,3 +268,54 @@ image, Plus 6 / 8, Ultra 8 / 12.
   the URL plus re-fetching the status. Revisit if the docs add a signature.
 - **Accessibility:** secondary text is `#9a9b9d` (Quanta's `#828282` fails
   4.5:1 on card surfaces). Lighthouse accessibility: 97+ on the generators.
+
+### OpenRouter billing is for what is rendered (first real run, 2026-11-22)
+
+A real Seedance 2.0 Mini job (4 s, 480p, 16:9) was billed $0.1421, against $0.1345
+on the listed 854×480 × 4 s basis (+5.6%). The file was 864×496 and 4.096 s. Prices
+now use the next multiple of 16 above each listed dimension and a 3% duration
+overshoot (`lib/openrouter/pricing.ts`), so a 4 s Mini clip prices at about $0.145 and
+Seedance 2.5 at 480p a little above $0.41. Only one real sample exists: re-check with
+`pnpm smoke:openrouter seedance-2.5 --yes` and keep watching the `usage.cost` log in
+finalize.
+
+### More OpenRouter models, three price shapes (2026-11-22)
+
+The remaining text / image-to-video models in `/videos/models` are wired from one
+spec table (`generation/catalog/models/openrouter-video.ts`), and a test compares
+it with the checked-in list. `PriceRule.factors` gained a joint key
+`"resolution&generate_audio"` (values `"720p|true"`) because Veo's prices are a
+table, not a product; the rule is anchored on the dearest combination so a body
+missing either field pays the worst case. Per-second SKUs get the same 3%
+duration overshoot as token prices. Resolution mapping for sizes now picks the
+run of resolutions nearest each ratio's nominal short side (Seedance 2.0's 9:21
+lists only 720p of four). `duration_seconds*` is read as USD per second (the
+docs state no unit). HeyGen, edit/upscale and Aleph 2 are skipped.
+
+## Bring your own key (BYOK, Nov 2026)
+
+* **Per user, per provider.** A signed-in user may store an OpenRouter key and/or
+  Higgsfield credentials (`user_keys`, AES-256-GCM, key `BYOK_ENCRYPTION_KEY`,
+  associated data `userId|provider`). Only `last4` ever reaches the browser. The
+  feature is off (the page says so) when the env var is missing.
+* **Billing.** If the user has their own key for the model's platform it wins:
+  the job runs on it and **no credits are charged** (`cost: 0`, no ledger rows,
+  `keySource: "user"`); otherwise the server key and credits as before; with
+  neither the model is inactive (`NEEDS_KEY`; shown in the picker's "Inactive:
+  connect your key" section). The server never mixes: one job, one key.
+* **Same key afterwards.** Status, download, cancel and reconcile build their
+  client from the generation's `userId` + `keySource` (`lib/generations/credentials.ts`).
+  A deleted or unreadable key ends the job as failed (`key_gone`) with a safe
+  message and **no credit movement**, never a fallback to the server key or to
+  another user's key. Webhooks carry no key; they only trigger a re-fetch.
+* **Guards that stay.** The per-run USD cap applies to user keys (their money).
+  Higgsfield's estimate guard is skipped for user keys (it protects our margin
+  and needs the server key). Concurrency limits and submit idempotency are
+  unchanged. Saving is rate limited (10/h/user).
+* **Higgsfield validation is format-only:** no read-only account or credits
+  endpoint is documented in the repo's docs, and `estimate`/`submit` are not
+  harmless probes. OpenRouter keys are checked with `GET /key`.
+* **Expand prompt** keeps using the server key only; it is not billed to a user key.
+* **Inactive models.** Models of a provider with no usable key are listed greyed
+  with their verified "from ✦N" price. Higgsfield models whose price is a
+  placeholder are not advertised. Tabs with no usable model are hidden.

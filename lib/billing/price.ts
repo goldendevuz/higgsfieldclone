@@ -168,9 +168,11 @@ export function factorFor(
 ): number {
   let product = 1
   for (const [field, values] of Object.entries(rule.factors ?? {})) {
-    const value = body[field]
-    if (value === undefined) continue
-    const factor = values[String(value)]
+    // "a&b" is a joint factor over two body fields, keyed "valueA|valueB"
+    // (for prices that are not a product, e.g. Veo's resolution × audio).
+    const parts = field.split("&").map((name) => body[name])
+    if (parts.some((part) => part === undefined)) continue
+    const factor = values[parts.map(String).join("|")]
     if (typeof factor === "number") product *= factor
   }
   return product
@@ -286,9 +288,9 @@ const ROLE_SAMPLE: Record<MediaItem["role"], MediaItem["kind"]> = {
 }
 
 /** Default-settings quote for the picker's "from ✦N" (5 s sample inputs when required). */
-export function fromPrice(modelId: string, table: CreditTable): number | null {
+export function fromQuote(modelId: string, table: CreditTable): Quote | null {
   const plain = tryPriceFor(modelId, {}, [], table)
-  if (plain) return plain.credits
+  if (plain) return plain
   const model = getModel(modelId)
   const needed = new Set(model.requiredRoles ?? [])
   if (!needed.size) {
@@ -309,5 +311,9 @@ export function fromPrice(modelId: string, table: CreditTable): number | null {
       role: "reference",
       kind: "image",
     })
-  return tryPriceFor(modelId, {}, sample, table)?.credits ?? null
+  return tryPriceFor(modelId, {}, sample, table)
+}
+
+export function fromPrice(modelId: string, table: CreditTable): number | null {
+  return fromQuote(modelId, table)?.credits ?? null
 }

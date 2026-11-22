@@ -56,5 +56,8 @@ export const LIMITS = {
   submitPerUser: { limit: 20, window: 60 },
   uploadPerUser: { limit: 60, window: 60 * 10 },
   statusPerUser: { limit: 120, window: 60 },
+  expandPerUser: { limit: 20, window: 60 * 60 },
+  /** Saving or deleting a provider key (each save makes one provider call). */
+  keysPerUser: { limit: 10, window: 60 * 60 },
   reportPerUser: { limit: 10, window: 60 * 60 },
 } as const

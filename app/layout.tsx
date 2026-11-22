@@ -13,6 +13,7 @@ import { getBalance } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { BRAND } from "@/lib/brand"
 import { clientPricing, type ClientPricing } from "@/lib/billing/pricing"
+import { userKeyPlatforms } from "@/lib/byok/keys"
 import { cn } from "@/lib/utils"
 
 import "./globals.css"
@@ -60,11 +61,15 @@ async function bootstrap(): Promise<{
   credits: number | null
   pricing: ClientPricing
 }> {
-  const pricing = await clientPricing()
   try {
     const user = await currentUser()
-    if (!user) return { user: null, credits: null, pricing }
-    const balance = await getBalance(user.objectId)
+    if (!user)
+      return { user: null, credits: null, pricing: await clientPricing() }
+    // Providers the user has their own key for make those models usable.
+    const [pricing, balance] = await Promise.all([
+      userKeyPlatforms(user.objectId).then((own) => clientPricing(own)),
+      getBalance(user.objectId),
+    ])
     return {
       user: {
         id: user.id,
@@ -83,7 +88,7 @@ async function bootstrap(): Promise<{
       "[layout] session unavailable",
       error instanceof Error ? error.message : error
     )
-    return { user: null, credits: null, pricing }
+    return { user: null, credits: null, pricing: await clientPricing() }
   }
 }
 

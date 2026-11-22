@@ -1,18 +1,23 @@
 "use client"
 
 /* eslint-disable @next/next/no-img-element */
+import { useEffect, useRef, useState } from "react"
 import {
   AtSign,
   ChevronRight,
   Loader2,
   Pencil,
   Sparkle,
+  Sparkles,
+  TriangleAlert,
+  Undo2,
   Volume2,
   VolumeX,
   Wand2,
   X,
 } from "lucide-react"
 
+import { useApp } from "@/components/providers/app-providers"
 import { LoopVideo } from "@/components/media/loop-video"
 import { settingLabel } from "@/components/studio/settings-dialog"
 import type { GeneratorTab, ModelEntry } from "@/generation/catalog/types"
@@ -68,6 +73,8 @@ export function ModelCard({ generator }: { generator: Generator }) {
       </div>
       <ModelPicker
         models={generator.models}
+        surface={generator.surface}
+        tab={generator.tab}
         value={model.id}
         onChange={generator.chooseModel}
         trigger={
@@ -97,6 +104,135 @@ const PLACEHOLDER: Record<GeneratorTab, string> = {
   create: "Describe the scene you imagine — subject, action, camera, light…",
   edit: "Describe the change — e.g. “make it snow”, “swap the jacket for red leather”…",
   motion: "Optional: describe the scene or style for the result…",
+}
+
+/** The value a setting currently has: the user's choice or the model default. */
+function settingValue(
+  generator: Generator,
+  key: string
+): string | number | boolean | undefined {
+  const chosen = generator.settings[key]
+  if (
+    typeof chosen === "string" ||
+    typeof chosen === "number" ||
+    typeof chosen === "boolean"
+  )
+    return chosen
+  const fallback = generator.model?.settings[key]?.default
+  return typeof fallback === "string" ||
+    typeof fallback === "number" ||
+    typeof fallback === "boolean"
+    ? fallback
+    : undefined
+}
+
+/**
+ * "Expand prompt": one idea in, a detailed sequenced prompt out (free, no
+ * credits). Hidden when the deployment has no OpenRouter key.
+ */
+function ExpandButton({ generator }: { generator: Generator }) {
+  const { prompt, setPrompt, surface } = generator
+  const { user, pricing, openAuth } = useApp()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [undo, setUndo] = useState<string | null>(null)
+  const expanded = useRef<string | null>(null)
+  // Editing the expansion by hand ends the undo (it would overwrite the edit).
+  useEffect(() => {
+    if (expanded.current !== null && prompt !== expanded.current) {
+      expanded.current = null
+      setUndo(null)
+    }
+  }, [prompt])
+  if (!pricing.canExpandPrompt || (surface !== "video" && surface !== "image"))
+    return null
+  const idea = prompt.trim()
+  const run = async () => {
+    if (!user) {
+      openAuth({
+        mode: "signup",
+        reason: "Create a free account to expand prompts.",
+      })
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const duration = settingValue(generator, "duration")
+      const aspect = settingValue(generator, "aspectRatio")
+      const audio = settingValue(generator, "generateAudio")
+      const response = await fetch("/api/prompt/expand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: idea,
+          kind: surface,
+          ...(surface === "video" && typeof duration === "number"
+            ? { durationSec: Math.round(duration) }
+            : {}),
+          ...(typeof aspect === "string" ? { aspectRatio: aspect } : {}),
+          ...(surface === "video" && typeof audio === "boolean"
+            ? { hasAudio: audio }
+            : {}),
+        }),
+      })
+      const data = (await response.json().catch(() => null)) as {
+        prompt?: unknown
+        error?: unknown
+      } | null
+      if (!response.ok || typeof data?.prompt !== "string") {
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Could not expand the prompt."
+        )
+        return
+      }
+      setUndo(prompt)
+      expanded.current = data.prompt
+      setPrompt(data.prompt)
+    } catch {
+      setError("Could not expand the prompt. Check your connection.")
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={busy || idea.length < 3}
+        title="Turn your idea into a detailed scene prompt (free)"
+        className="flex h-7 items-center gap-1 rounded-lg bg-panel px-2 text-xs font-semibold text-foreground transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:text-muted-foreground"
+      >
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Sparkles className="size-3.5" />
+        )}
+        {busy ? "Expanding…" : "Expand prompt"}
+      </button>
+      {undo !== null ? (
+        <button
+          type="button"
+          onClick={() => {
+            setPrompt(undo)
+            setUndo(null)
+            expanded.current = null
+          }}
+          className="flex h-7 items-center gap-1 rounded-lg bg-panel px-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Undo2 className="size-3.5" /> Undo
+        </button>
+      ) : null}
+      {error ? (
+        <span role="alert" className="basis-full text-xs text-[#ff6b6b]">
+          {error}
+        </span>
+      ) : null}
+    </>
+  )
 }
 
 export function PromptCard({ generator }: { generator: Generator }) {
@@ -185,6 +321,7 @@ export function PromptCard({ generator }: { generator: Generator }) {
             {audioOn ? "On" : "Off"}
           </button>
         ) : null}
+        <ExpandButton generator={generator} />
         {preset ? (
           <span className="flex h-7 items-center gap-1 rounded-lg bg-panel px-2 text-xs text-muted-foreground">
             <AtSign className="size-3" /> {preset.title} style
@@ -210,6 +347,8 @@ export function ModelRow({ generator }: { generator: Generator }) {
   return (
     <ModelPicker
       models={generator.models}
+      surface={generator.surface}
+      tab={generator.tab}
       value={model.id}
       onChange={generator.chooseModel}
       trigger={
@@ -242,7 +381,15 @@ export function GenerateButton({
   generator: Generator
   className?: string
 }) {
-  const { quote, canGenerate, disabledReason, submitting } = generator
+  const {
+    quote,
+    canGenerate,
+    disabledReason,
+    submitting,
+    costWarning,
+    billedToKey,
+    model,
+  } = generator
   const blocked = !canGenerate
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -260,7 +407,9 @@ export function GenerateButton({
       >
         {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
         Generate
-        {quote ? (
+        {quote && billedToKey ? (
+          <span className="flex items-center gap-1 text-sm">your key</span>
+        ) : quote ? (
           <span className="flex items-center gap-1 font-mono">
             <Sparkle className="size-4 fill-current" aria-hidden />
             <span aria-label={`${quote.credits} credits`}>{quote.credits}</span>
@@ -276,6 +425,22 @@ export function GenerateButton({
           className="text-center text-xs text-muted-foreground"
         >
           {disabledReason}
+        </p>
+      ) : null}
+      {billedToKey ? (
+        <p
+          data-testid="billed-to-key"
+          className="text-center text-xs text-muted-foreground"
+        >
+          Billed to your{" "}
+          {model?.platform === "openrouter" ? "OpenRouter" : "Higgsfield"} key.
+          No credits used.
+        </p>
+      ) : null}
+      {costWarning ? (
+        <p role="status" className="flex items-start gap-1.5 text-xs text-pink">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {costWarning}
         </p>
       ) : null}
     </div>

@@ -1,7 +1,8 @@
 # Vireo — contract for coding agents
 
-Vireo is a credit-metered AI image/video studio on the Higgsfield REST API,
-scaffolded from `higgsfield-ai/app-templates` (studio). Read `README.md`,
+Vireo is a credit-metered AI image/video studio on the Higgsfield REST API and
+OpenRouter's video API (a model's `platform` says which), scaffolded from
+`higgsfield-ai/app-templates` (studio). Read `README.md`,
 `docs/decisions.md` and `docs/model-catalog.md` before changing behaviour.
 
 ## Layout
@@ -11,8 +12,8 @@ scaffolded from `higgsfield-ai/app-templates` (studio). Read `README.md`,
   (account, billing, admin) · `app/api` route handlers · `app/actions` server actions.
 - `generation/catalog/models/*.ts` — one file per model family; the barrel is
   generated (`pnpm models`). Never hand-edit `models.generated.ts`.
-- `lib/higgsfield` (server-only platform client), `lib/generations` (submit,
-  finalize, reconcile, cancel, library), `lib/billing` (price, ledger, Stripe),
+- `lib/higgsfield` and `lib/openrouter` (server-only provider clients),
+  `lib/generations` (submit, finalize, reconcile, cancel, webhook, library), `lib/billing` (price, ledger, Stripe),
   `lib/db`, `lib/storage` (R2 / local), `lib/uploads.ts`, `auth.ts`.
 - `components/generator` (panel, dock, canvas, picker), `components/studio`
   (template primitives: prompt box, gallery, lightbox, asset library),
@@ -20,8 +21,10 @@ scaffolded from `higgsfield-ai/app-templates` (studio). Read `README.md`,
 
 ## Invariants — preserve these
 
-- **Server only:** the platform key, Stripe/Resend/R2 secrets and model paths.
-  `lib/higgsfield/**` imports `server-only`. Request paths and bodies come from
+- **Server only:** the platform keys (`HF_CREDENTIALS`, `OPENROUTER_API_KEY`),
+  Stripe/Resend/R2 secrets and model paths. `lib/higgsfield/**` and
+  `lib/openrouter/**` import `server-only`; the OpenRouter key is only ever sent
+  to the configured API origin. Request paths and bodies come from
   the catalog (`toPlatform`), never from the client.
 - **Every server action / route handler** calls `auth()` (via `requireUser`)
   and scopes queries by `userId`; other users' ids are 404, not 403.
@@ -30,7 +33,9 @@ scaffolded from `higgsfield-ai/app-templates` (studio). Read `README.md`,
 - **Prices come from `priceFor`/`quoteRequest`** on the server; the client's
   number is display only.
 - **Finalize is the only path to a terminal status**; it re-fetches the status
-  (webhook payloads are untrusted) and refunds failed/nsfw/canceled once.
+  from the generation's own provider (webhook payloads are untrusted) and
+  refunds failed/nsfw/canceled (OpenRouter: failed/expired/cancelled) once.
+  Old generation documents without `platform` are Higgsfield.
 - **Poll our DB, not the platform:** the browser polls
   `GET /api/generations/status`; never poll through a server action.
 - **Model files cite their docs URLs**; never invent endpoints, fields or enums.

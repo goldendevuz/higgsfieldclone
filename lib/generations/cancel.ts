@@ -3,9 +3,11 @@ import "server-only"
 import type { ObjectId } from "mongodb"
 
 import { NotFoundError, UserFacingError } from "@/lib/errors"
-import { collections } from "@/lib/db/collections"
-import { higgsfield, PlatformError } from "@/lib/higgsfield/client"
+import { collections, platformOfDoc } from "@/lib/db/collections"
+import { UserKeyMissingError } from "@/lib/byok/keys"
+import { PlatformError } from "@/lib/higgsfield/client"
 
+import { higgsfieldFor, userKeyActionError } from "./credentials"
 import { finalizeGeneration } from "./finalize"
 
 /**
@@ -20,6 +22,13 @@ export async function cancelGeneration(
   const { generations } = await collections()
   const gen = await generations.findOne({ _id: generationId, userId })
   if (!gen) throw new NotFoundError("Generation not found.")
+  // OpenRouter documents no cancel endpoint, so we don't pretend: the job runs
+  // to its end (a failed one isn't billed; the run timeout still refunds).
+  if (platformOfDoc(gen) === "openrouter")
+    throw new UserFacingError(
+      "OpenRouter generations can't be canceled once started. It will finish or fail on its own.",
+      "NOT_CANCELABLE"
+    )
   if (gen.status === "pending_submit")
     throw new UserFacingError(
       "Still starting — try cancelling again in a few seconds.",
@@ -33,8 +42,9 @@ export async function cancelGeneration(
       "NOT_CANCELABLE"
     )
   try {
-    await higgsfield().cancel(gen.hfRequestId!)
+    await (await higgsfieldFor(gen)).cancel(gen.hfRequestId!)
   } catch (caught) {
+    if (caught instanceof UserKeyMissingError) throw userKeyActionError(caught)
     if (caught instanceof PlatformError && caught.status === 400) {
       await generations.updateOne(
         { _id: gen._id, status: "queued" },

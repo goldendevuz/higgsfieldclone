@@ -5,6 +5,9 @@ import type { MediaRole } from "@/generation/catalog/types"
  *
  *   usd = usd × units × Π factors[field][String(body[field])] + perItem
  *
+ * A factor field may join two body fields with "&" ("resolution&generate_audio");
+ * its keys are the two values joined by "|" ("720p|true").
+ *
  * `per: "second"` reads units from `body[field ?? "duration"]` (or
  * `defaultUnits` when the endpoint derives length from a source video);
  * `per: "output"` reads the count from `body[field ?? "batch_size"]`
@@ -32,9 +35,11 @@ export type PriceRule = {
    * Where the number came from: "estimate" = POST /estimate (`pnpm
    * pricing:sync`); "description" = hand-derived from the pricing text the
    * estimate endpoint returns for token-metered models; "placeholder" =
-   * unverified (not sold on the live platform until an admin sets a price).
+   * unverified (not sold on the live platform until an admin sets a price);
+   * "openrouter" = derived from OpenRouter's model list (`pnpm
+   * pricing:sync:openrouter`, lib/openrouter/pricing.ts).
    */
-  source: "placeholder" | "estimate" | "description" | "admin"
+  source: "placeholder" | "estimate" | "description" | "admin" | "openrouter"
 }
 
 export type PricingTable = Record<string, PriceRule>

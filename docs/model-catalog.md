@@ -20,6 +20,107 @@ contract comes from, and why anything is left out.
   flagged placeholder (`source: "placeholder"`), which the live API never
   sells until an admin prices it (see `docs/runbook.md` → Pricing).
 
+## Availability per visitor
+
+A model is selectable when its provider has the **server key** or the signed-in
+user has stored **their own key** for it (`/account/keys`, see `docs/decisions.md`
+→ BYOK; runs on the user's key cost no credits). Otherwise it is listed in the
+picker's **Inactive: connect your key** section (greyed, "from ✦N", reason,
+Connect key). Only models with a documented or derived price are listed there:
+Higgsfield models priced as `placeholder` are not advertised.
+
+## OpenRouter (second provider)
+
+Entries with `platform: "openrouter"` run on OpenRouter's video API instead of
+Higgsfield. They are separate picker entries (ids end in `-openrouter`) so the
+two providers' prices, limits and behaviour never blur. Researched 2026-11-22
+against:
+
+* `https://openrouter.ai/docs/api/api-reference/video-generation/submit-a-video-generation-request` (request body, response, statuses)
+* `https://openrouter.ai/docs/guides/overview/multimodal/video-generation` (flow, webhooks, download)
+* `GET https://openrouter.ai/api/v1/videos/models` (resolutions, aspect ratios, sizes, durations, token prices)
+
+One endpoint (`POST /api/v1/videos`) serves every mode; pricing paths are
+`openrouter/{model slug}`.
+
+| Picker id | Label | Slug | Inputs / modes | Settings (UI → API) | Status |
+|---|---|---|---|---|---|
+| `seedance-2.5-openrouter` | Seedance 2.5 (OpenRouter) | `bytedance/seedance-2.5` | text · first (+ last) frame → `frame_images` · ≤9 image references → `input_references` | aspect auto·16:9·4:3·1:1·3:4·9:16·21:9 (16:9) → `aspect_ratio`; duration 4–30 (4) → `duration`; resolution 480p·720p·1080p (**480p**) → `resolution`; audio (on) → `generate_audio` | Live |
+| `seedance-2.0-mini-openrouter` | Seedance 2.0 Mini (OpenRouter) | `bytedance/seedance-2.0-mini` | as above | as above plus 9:21; duration 4–15; resolution 480p·720p (**480p**) | Live |
+
+Prices (provider cost, no video input, 16:9): Seedance 2.5 about $0.103/s at
+480p, $0.231/s at 720p, $0.569/s at 1080p; Mini about $0.034/s at 480p and
+$0.076/s at 720p (the model list's token prices times tokens per second; see
+`docs/runbook.md` → OpenRouter pricing). Audio does not change the price.
+
+### More OpenRouter video models (2026-11-22)
+
+Built by `generation/catalog/models/openrouter-video.ts` from the live list
+(values copied from `GET /api/v1/videos/models`, checked in as
+`lib/openrouter/models.generated.json`; `tests/openrouter-models.test.ts`
+fails if the file and the list disagree). Inputs: text, first frame, and for
+the models that list `last_frame` a last frame; image references only on the
+Seedance entries. Resolution defaults to the cheapest the SKUs price.
+
+| Picker id | Slug | Resolutions (default) | Durations (default) | Frames | Audio toggle | Price shape |
+|---|---|---|---|---|---|---|
+| `seedance-2.5-flash-openrouter` | `bytedance/seedance-2.5-flash` | 480p·720p (480p) | 4–30 (4) | first+last, refs | yes | tokens |
+| `seedance-2.0-openrouter` | `bytedance/seedance-2.0` | 480p·720p·1080p·4K (480p) | 4–15 (4) | first+last, refs | yes | tokens |
+| `seedance-2.0-fast-openrouter` | `bytedance/seedance-2.0-fast` | 480p·720p (480p) | 4–15 (4) | first+last, refs | yes | tokens |
+| `veo-3.1-openrouter` | `google/veo-3.1` | 720p·1080p·4K (720p) | 4·6·8 (4) | first+last | yes | USD/s, resolution × audio |
+| `veo-3.1-fast-openrouter` | `google/veo-3.1-fast` | 720p·1080p·4K (720p) | 4·6·8 (4) | first+last | yes | USD/s, resolution × audio |
+| `veo-3.1-lite-openrouter` | `google/veo-3.1-lite` | 720p·1080p (720p) | 4·6·8 (4) | first+last | yes | USD/s, resolution × audio |
+| `gemini-omni-1.2-flash-openrouter` | `google/gemini-omni-1.2-flash` | 360p·720p·1080p·4K (360p) | 3–15 (4) | first+last | no (always audio) | USD/s per resolution |
+| `gemini-omni-1.1-flash-openrouter` | `google/gemini-omni-1.1-flash` | 360p·720p·1080p·4K (360p) | 3–10 (4) | first+last | no | USD/s per resolution |
+| `grok-imagine-video-1.5-openrouter` | `x-ai/grok-imagine-video-1.5` | 480p·720p·1080p (480p) | 1–15 (4) | first | yes | cents/s + cents per input image |
+| `grok-imagine-video-1.5-lite-openrouter` | `x-ai/grok-imagine-video-1.5-lite` | 480p·720p·1080p (480p) | 1–15 (4) | first | yes | cents/s + per image |
+| `grok-imagine-video-openrouter` | `x-ai/grok-imagine-video` | 480p·720p (480p) | 1–15 (4) | first | no | cents/s + per image |
+| `wan-3-openrouter` / `wan-3-prime-openrouter` | `alibaba/wan-3.0[-prime]` | 480p·720p·1080p (480p) | 2–30 (4) | first+last | yes | USD/s per resolution |
+| `happy-horse-1-openrouter` / `happy-horse-1.1-openrouter` | `alibaba/happyhorse-1.0` / `-1.1` | 720p·1080p (720p) | 3–15 (4) | first | no | USD/s per resolution |
+| `hailuo-3-openrouter` | `minimax/hailuo-3` | 2K fixed | 5–15 (5) | first+last | yes | flat USD/s |
+| `hailuo-3-max-openrouter` | `minimax/hailuo-3-max` | 480p·768p (480p) | 5–15 (5) | first+last | no | USD/s per resolution |
+| `hailuo-2.3-openrouter` | `minimax/hailuo-2.3` | 1080p fixed, 16:9 only | 6·10 (6) | first | no | flat USD/s |
+| `runway-gen-4.5-openrouter` | `runway/gen-4.5` | 720p fixed | 2–10 (4) | first | no | cents/s |
+| `flux-3-video-openrouter` | `black-forest-labs/flux-3-video` | 720p·1080p·2K·4K (720p) | 5–20 (5) | first+last | yes | cents/s per resolution |
+| `mischief-1-openrouter` | `tbc/mischief-1` | 480p·720p (480p), 16:9 only | 3·5 (3) | first (required) | no | cents/s per resolution |
+
+SKU reading (see `lib/openrouter/pricing.ts`): `video_tokens[_res]` USD per video
+token; `duration_seconds[_with|without_audio][_res]` USD per second (the docs give
+no unit for these names; USD matches Veo 3.1's published $0.40/s and the docs'
+own example `per-video-second: "0.50"`); `cents_per_video_output_second[_res]`,
+`cents_per_second_output[_res]` US cents per second; `cents_per_image_input`
+cents per input image (Grok, added for a start frame). A SKU without resolution
+suffix prices every resolution that has none of its own. Video-input,
+continuation and reference-image SKUs are never used because we send none.
+Gemini Omni lists only `with_audio` SKUs, so it is always priced with audio and
+offers no toggle. Every price carries the 3% duration overshoot; token prices
+also the 16-aligned rendered size.
+
+Skipped, with the reason:
+
+| Model | Reason |
+|---|---|
+| `heygen/heygen-avatar-6`, `-6-turbo`, `heygen/avatar-iv` | Avatar / talking-head models (need a photo or voice input, `motion_expressiveness`-style parameters), out of scope |
+| `heygen/heygen-video-1` | HeyGen; also prices `long_duration_*` and `reference_*` tiers whose thresholds the list does not state |
+| `black-forest-labs/flux-video-edit`, `flux-video-upscale` | Edit / upscale: need an input video |
+| `runway/aleph-2` | In-context video edit: needs input video, no resolutions/durations listed, per-generation minimum |
+
+Unverified assumptions: the `duration_seconds*` unit above; Veo's 1080p / 4K
+duration limits are not in the list (an unsupported combination fails at the
+provider and is refunded); the first real run of each family should be compared
+with the `[pricing] provider billed` log line.
+
+Deliberately **not** offered:
+
+| Capability | Why |
+|---|---|
+| Edit / Extend | The request schema has `previous_job_id` ("ID of a completed video job to edit or extend … only models that support continuation accept this field"), but no page says which models, which fields apply, or how a continuation is billed. Not guessed. |
+| Audio / video references | `input_references` accepts them for Seedance 2+, but input video is billed per second at a different rate and no limits are published. |
+| Cancel | No cancel endpoint is documented; the UI hides Cancel for OpenRouter jobs. |
+| Resolution `size` field | `resolution` + `aspect_ratio` are used; `size` is documented as interchangeable. |
+| Kling and other OpenRouter models | Not in `/videos/models` (the list is the source of truth). |
+| `seed`, `watermark`, `provider` routing options | Not exposed in v1. |
+
 Status legend: **Live** = documented REST endpoint, wired into the picker ·
 **Unverified** = seen in the template/CLI/site but not in the REST docs, kept out
 of the picker · **Not in API** = exists only in Higgsfield's own app or agent/CLI

@@ -87,7 +87,14 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
   const pendingResume = useRef(false)
 
   const disabled = useMemo(() => new Set(pricing.disabled), [pricing.disabled])
-  const tabs = useMemo(() => tabsFor(surface), [surface])
+  // Only tabs that have at least one usable model (an Edit tab whose models
+  // all need a missing key would leave the generator empty).
+  const tabs = useMemo(() => {
+    const usable = tabsFor(surface).filter((value) =>
+      modelsFor(surface, value).some((entry) => !disabled.has(entry.id))
+    )
+    return usable.length ? usable : tabsFor(surface).slice(0, 1)
+  }, [disabled, surface])
   const tab: GeneratorTab = tabs.includes(dock.tab)
     ? dock.tab
     : (tabs[0] ?? "create")
@@ -218,6 +225,22 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
         : null,
     [finalPrompt, media, model, pricing.table, settings]
   )
+
+  // The visitor's own key runs this model: billed by the provider, no credits.
+  const billedToKey = Boolean(
+    model && pricing.ownKeys.includes(model.platform ?? "higgsfield")
+  )
+
+  // OpenRouter bills real money per second with no estimate endpoint, so a
+  // costly run gets a visible warning (threshold: OPENROUTER_WARN_USD).
+  const costWarning =
+    model?.platform === "openrouter" &&
+    quote &&
+    quote.credits >= pricing.expensiveCredits
+      ? billedToKey
+        ? "Costly run on your OpenRouter key. Try a draft first: a cheaper model, a shorter clip, or a lower resolution."
+        : `Costly run: ${quote.credits} credits. Try a draft first: Seedance 2.0 Mini at 480p, a shorter clip, or 480p.`
+      : undefined
 
   const hasInput = finalPrompt.trim().length > 0 || media.length > 0
   // The endpoint these settings reach has no price (yet) on this deployment.
@@ -447,6 +470,8 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     },
     library: { items: libraryItems, onUpload: upload },
     quote,
+    billedToKey,
+    costWarning,
     canGenerate,
     disabledReason,
     generate,

@@ -2,7 +2,12 @@ import "server-only"
 
 import type { ObjectId } from "mongodb"
 
-import type { MediaKind, MediaRole, Surface } from "@/generation/catalog/types"
+import type {
+  MediaKind,
+  MediaRole,
+  ModelPlatform,
+  Surface,
+} from "@/generation/catalog/types"
 import type { PlanId, BillingInterval } from "@/lib/billing/plans"
 import type { PriceRule } from "@/lib/billing/pricing-types"
 
@@ -60,6 +65,20 @@ export const TERMINAL: readonly GenerationStatus[] = [
   "canceled",
 ]
 
+export type KeySource = "user" | "server"
+
+/** The key source of a stored generation; documents without `keySource` used the server key. */
+export function keySourceOf(doc: Pick<GenerationDoc, "keySource">): KeySource {
+  return doc.keySource ?? "server"
+}
+
+/** The provider of a stored generation; old documents without `platform` are Higgsfield. */
+export function platformOfDoc(
+  doc: Pick<GenerationDoc, "platform">
+): ModelPlatform {
+  return doc.platform ?? "higgsfield"
+}
+
 export interface GenerationMedia {
   role: MediaRole
   kind: MediaKind
@@ -91,12 +110,28 @@ export interface GenerationDoc {
   surface: Surface
   modelId: string
   modelLabel: string
+  /**
+   * Provider that runs this generation. Documents written before OpenRouter
+   * was added have no `platform` and are Higgsfield (see `platformOfDoc`).
+   */
+  platform?: ModelPlatform
+  /**
+   * Whose provider key ran this generation. "user" = the account's own key
+   * (BYOK): no credits were charged and every later provider call (status,
+   * download, cancel) uses that same stored key. Missing = "server".
+   */
+  keySource?: KeySource
   modelPath: string
   requestBody: Record<string, unknown>
   prompt: string
   settings: Record<string, unknown>
   media: GenerationMedia[]
   status: GenerationStatus
+  /**
+   * The provider's job id: Higgsfield `request_id` or OpenRouter video job
+   * `id`. The name is historical (kept so existing documents, the unique index
+   * and queries keep working); read `platform` to know whose id it is.
+   */
   hfRequestId?: string
   /** Credits charged, and how they split across buckets. */
   cost: number
@@ -105,6 +140,8 @@ export interface GenerationDoc {
   refunded: number
   /** USD our price was based on (for margin reporting). */
   priceUsd: number
+  /** USD the provider billed (OpenRouter `usage.cost`), when reported. */
+  providerCostUsd?: number
   /** How the charge was computed; provisional units are trued up at finalize. */
   billing: {
     units: number
@@ -247,6 +284,27 @@ export interface ReportDoc {
   createdAt: Date
 }
 
+/**
+ * A user's own provider key (BYOK), AES-256-GCM encrypted. One per
+ * {userId, provider}. Nothing here is ever sent to the browser except `last4`.
+ */
+export interface UserKeyDoc {
+  _id: ObjectId
+  userId: ObjectId
+  provider: ModelPlatform
+  /** base64 ciphertext, 12-byte IV and 16-byte auth tag. */
+  ciphertext: string
+  iv: string
+  tag: string
+  /** Last four characters of the key, for display. */
+  last4: string
+  /** True when the provider confirmed the key with a harmless call. */
+  verified: boolean
+  createdAt: Date
+  updatedAt: Date
+  lastUsedAt?: Date
+}
+
 export interface DevMailDoc {
   _id: ObjectId
   to: string
@@ -273,6 +331,7 @@ export async function collections() {
     rateLimits: database.collection<RateLimitDoc>("rate_limits"),
     reports: database.collection<ReportDoc>("reports"),
     devMailbox: database.collection<DevMailDoc>("dev_mailbox"),
+    userKeys: database.collection<UserKeyDoc>("user_keys"),
     sessions: database.collection<{
       userId: ObjectId
       expires: Date

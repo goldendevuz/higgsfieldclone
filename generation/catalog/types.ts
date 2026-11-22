@@ -48,6 +48,13 @@ export type SettingField = (
   unit?: string
 }
 
+/**
+ * Which generation provider serves a model. Higgsfield is the original
+ * platform; OpenRouter is a second one (async video API, one endpoint for all
+ * modes). Entries without `platform` are Higgsfield models.
+ */
+export type ModelPlatform = "higgsfield" | "openrouter"
+
 export type PlatformPaths = {
   text?: string
   image?: string
@@ -55,12 +62,18 @@ export type PlatformPaths = {
   reference?: string
 }
 
-/** Platform request: model path (appended to HF_API_BASE_URL) and JSON body. */
+/**
+ * Platform request: model path (appended to HF_API_BASE_URL for Higgsfield;
+ * for OpenRouter a pricing key `openrouter/{model slug}`, the HTTP route is
+ * always POST /videos) and JSON body.
+ */
 export type PlatformRequest = { path: string; body: Record<string, unknown> }
 
 export type ModelEntry = {
   id: string
   surface: Surface
+  /** Provider that runs this model; defaults to "higgsfield". */
+  platform?: ModelPlatform
   label: string
   roles: Partial<Record<MediaRole, number>>
   mediaModes?: MediaMode[]

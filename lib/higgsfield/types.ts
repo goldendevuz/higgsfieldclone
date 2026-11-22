@@ -20,6 +20,10 @@ export type PlatformArtifact = {
   kind: "image" | "video" | "audio" | "file"
   url: string
   contentType?: string
+  /** Downloading needs the provider's key (OpenRouter content URLs). */
+  authorized?: boolean
+  /** Key-less copy of the same file, used only if our own copy keeps failing. */
+  fallbackUrl?: string
 }
 
 export type RequestStatus = {
@@ -27,6 +31,8 @@ export type RequestStatus = {
   requestId: string
   artifacts: PlatformArtifact[]
   error?: string
+  /** What the provider billed us in USD, when it says (OpenRouter `usage.cost`). */
+  costUsd?: number
 }
 
 export type UploadTicket = {

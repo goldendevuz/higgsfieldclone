@@ -7,6 +7,7 @@ import {
   CreditCard,
   FolderOpen,
   Gem,
+  KeyRound,
   LogOut,
   Menu,
   Shield,
@@ -177,6 +178,9 @@ function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/account/billing" />}>
           <CreditCard /> Billing
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/account/keys" />}>
+          <KeyRound /> API keys
         </DropdownMenuItem>
         {user.role === "admin" ? (
           <DropdownMenuItem render={<Link href="/admin" />}>

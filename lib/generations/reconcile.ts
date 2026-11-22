@@ -2,10 +2,14 @@ import "server-only"
 
 import { refundGeneration } from "@/lib/billing/ledger"
 import { grantMonthlyAllowances } from "@/lib/billing/subscriptions"
-import { collections, IN_FLIGHT, TERMINAL } from "@/lib/db/collections"
+import {
+  collections,
+  IN_FLIGHT,
+  platformOfDoc,
+  TERMINAL,
+} from "@/lib/db/collections"
 import { env } from "@/lib/env"
-import { higgsfield } from "@/lib/higgsfield/client"
-
+import { higgsfieldFor } from "./credentials"
 import { finalizeGeneration, recopyPlatformOutputs } from "./finalize"
 
 /**
@@ -80,8 +84,9 @@ export async function reconcile(
           $set: {
             status: "failed",
             errorKind: "submit",
-            error:
-              "We couldn't confirm this generation started. Credits refunded.",
+            error: `We couldn't confirm this generation started.${
+              gen.keySource === "user" ? "" : " Credits refunded."
+            }`,
             finishedAt: now,
             updatedAt: now,
           },
@@ -105,9 +110,16 @@ export async function reconcile(
     await guard(async () => {
       // One last look: it may have finished without a webhook.
       if ((await finalizeGeneration(gen._id)) !== "in_flight") return
-      if (gen.status === "queued" && gen.hfRequestId)
-        await higgsfield()
-          .cancel(gen.hfRequestId)
+      // Only Higgsfield can cancel; OpenRouter documents no cancel endpoint.
+      if (
+        gen.status === "queued" &&
+        gen.hfRequestId &&
+        platformOfDoc(gen) === "higgsfield"
+      )
+        // Best effort, with the key the job was submitted with (a user's
+        // deleted key just means no cancel; the run is failed below anyway).
+        await higgsfieldFor(gen)
+          .then((client) => client.cancel(gen.hfRequestId!))
           .catch(() => undefined)
       const result = await generations.updateOne(
         { _id: gen._id, status: { $in: ["queued", "in_progress"] } },
@@ -115,8 +127,9 @@ export async function reconcile(
           $set: {
             status: "failed",
             errorKind: "timeout",
-            error:
-              "This generation took too long and was stopped. Credits refunded.",
+            error: `This generation took too long and was stopped.${
+              gen.keySource === "user" ? "" : " Credits refunded."
+            }`,
             finishedAt: now,
             updatedAt: now,
           },
@@ -141,7 +154,12 @@ export async function reconcile(
   for (const gen of stale)
     await guard(async () => {
       const outcome = await finalizeGeneration(gen._id)
-      if (outcome === "completed" || outcome === "refunded") summary.finalized++
+      if (
+        outcome === "completed" ||
+        outcome === "refunded" ||
+        outcome === "key_gone"
+      )
+        summary.finalized++
     })
 
   // 4. Refund sweep: terminal failures whose refund never landed.
