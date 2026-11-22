@@ -182,11 +182,14 @@ export async function copyFromUrl(
     contentType?: string
     maxBytes?: number
     fetch?: typeof fetch
+    /** Request headers, e.g. a provider's Authorization for key-protected downloads. */
+    headers?: Record<string, string>
   } = {}
 ): Promise<StoredObject> {
   const hintContentType = options.contentType
   const maxBytes = options.maxBytes ?? MAX_COPY_BYTES
   const response = await (options.fetch ?? fetch)(sourceUrl, {
+    ...(options.headers ? { headers: options.headers } : {}),
     cache: "no-store",
     signal: AbortSignal.timeout(120_000),
   })

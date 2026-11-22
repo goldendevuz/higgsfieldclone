@@ -1,4 +1,9 @@
-import type { MediaKind, MediaRole, Surface } from "@/generation/catalog/types"
+import type {
+  MediaKind,
+  MediaRole,
+  ModelPlatform,
+  Surface,
+} from "@/generation/catalog/types"
 
 /** What the browser sees of a generation (no request bodies, no platform ids). */
 export type GenerationStatusView =
@@ -23,6 +28,8 @@ export interface GenerationView {
   surface: Surface
   modelId: string
   modelLabel: string
+  /** Provider; OpenRouter jobs have no cancel endpoint, so the tile hides Cancel. */
+  platform: ModelPlatform
   prompt: string
   settings: Record<string, unknown>
   media: { role: MediaRole; kind: MediaKind; url: string; name?: string }[]

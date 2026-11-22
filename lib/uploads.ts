@@ -8,6 +8,7 @@ import { z } from "zod"
 import {
   mediaKindFromMime,
   requireUploadContentType,
+  type UploadTicket,
 } from "@/generation/upload-contract"
 import type { MediaKind } from "@/generation/catalog/types"
 import { UserFacingError } from "@/lib/errors"
@@ -15,7 +16,7 @@ import type { SessionUser } from "@/lib/auth/session"
 import { objectIdOrNotFound } from "@/lib/ids"
 import { NotFoundError } from "@/lib/errors"
 import { collections, type UploadDoc } from "@/lib/db/collections"
-import { env } from "@/lib/env"
+import { env, providersConfigured } from "@/lib/env"
 import { toUploadView } from "@/lib/generations/serialize"
 import type { UploadView } from "@/lib/generations/view"
 import { higgsfield } from "@/lib/higgsfield/client"
@@ -24,6 +25,8 @@ import {
   copyFromUrl,
   deleteObjects,
   MediaTooLargeError,
+  publicUrlFor,
+  putObject,
   readCapped,
   storageDriver,
 } from "@/lib/storage"
@@ -59,6 +62,99 @@ function sign(parts: string[]): string {
     .digest("hex")
 }
 
+/* ── Direct uploads (no Higgsfield key): our own signed PUT endpoint ─────── */
+
+const DIRECT_EXTENSION: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+}
+
+function directSignature(key: string, contentType: string, expires: string) {
+  return sign(["direct-upload", key, contentType, expires])
+}
+
+/** A ticket whose upload URL is our own endpoint (app/api/upload/direct). */
+function directUploadTicket(
+  user: SessionUser,
+  contentType: string
+): UploadTicket {
+  const key = `u/${user.id}/uploads/${new ObjectId().toHexString()}.${DIRECT_EXTENSION[contentType] ?? "bin"}`
+  const expires = String(Date.now() + TICKET_TTL_MS)
+  const url = new URL("/api/upload/direct", env().APP_URL)
+  url.searchParams.set("k", key)
+  url.searchParams.set("c", contentType)
+  url.searchParams.set("e", expires)
+  url.searchParams.set("s", directSignature(key, contentType, expires))
+  return {
+    upload_url: url.toString(),
+    public_url: publicUrlFor(key),
+    content_type: contentType,
+    upload_headers: { "Content-Type": contentType },
+  }
+}
+
+/**
+ * Verify a direct-upload URL's signature and write the body to storage.
+ * Called by PUT /api/upload/direct, which has no session (the browser sends
+ * no credentials to upload URLs): the signed key already names the user.
+ */
+export async function receiveDirectUpload(
+  params: URLSearchParams,
+  headerContentType: string | null,
+  body: ReadableStream<Uint8Array> | null
+): Promise<void> {
+  const key = params.get("k") ?? ""
+  const contentType = params.get("c") ?? ""
+  const expires = params.get("e") ?? ""
+  const signature = params.get("s") ?? ""
+  if (!/^u\/[a-f0-9]{24}\/uploads\/[a-f0-9]{24}\.[a-z0-9]{2,4}$/.test(key))
+    throw new UserFacingError("Invalid upload.", "BAD_TICKET")
+  if (!/^[a-f0-9]{64}$/.test(signature) || !/^\d+$/.test(expires))
+    throw new UserFacingError("Invalid upload.", "BAD_TICKET")
+  const expected = Buffer.from(
+    directSignature(key, contentType, expires),
+    "hex"
+  )
+  const given = Buffer.from(signature, "hex")
+  if (expected.length !== given.length || !timingSafeEqual(expected, given))
+    throw new UserFacingError("Invalid upload.", "BAD_TICKET")
+  if (Number(expires) < Date.now())
+    throw new UserFacingError(
+      "This upload expired. Upload the file again.",
+      "EXPIRED"
+    )
+  if (headerContentType?.split(";")[0]?.trim() !== contentType || !body)
+    throw new UserFacingError("Invalid upload.", "BAD_TICKET")
+  const kind = mediaKindFromMime(requireUploadContentType(contentType))
+  try {
+    const bytes = await readCapped(body, MAX_UPLOAD_BYTES[kind])
+    await putObject(key, bytes, contentType)
+  } catch (caught) {
+    if (caught instanceof MediaTooLargeError)
+      throw new UserFacingError(
+        "That file is larger than the upload limit.",
+        "TOO_LARGE"
+      )
+    throw caught
+  }
+}
+
+/** The storage key behind one of our own public URLs for this user's uploads, if it is one. */
+function ownUploadKey(publicUrl: string, userId: string): string | undefined {
+  const prefix = publicUrlFor(`u/${userId}/uploads/`)
+  if (!publicUrl.startsWith(prefix)) return undefined
+  const rest = publicUrl.slice(prefix.length)
+  return /^[a-f0-9]{24}\.[a-z0-9]{2,4}$/.test(rest)
+    ? `u/${userId}/uploads/${rest}`
+    : undefined
+}
+
 export const ticketRequestSchema = z.object({
   contentType: z.string(),
   size: z.number().int().positive(),
@@ -87,7 +183,12 @@ export async function createUploadTicket(user: SessionUser, raw: unknown) {
     LIMITS.uploadPerUser.window,
     "Too many uploads. Wait a few minutes and try again."
   )
-  const ticket = await higgsfield().createUpload(contentType)
+  // With a Higgsfield key the platform issues the upload URL (original flow).
+  // Without one (OpenRouter-only), uploads go through our own signed endpoint
+  // into our storage: OpenRouter has no upload API and needs https URLs.
+  const ticket = providersConfigured().higgsfield
+    ? await higgsfield().createUpload(contentType)
+    : directUploadTicket(user, contentType)
   const expires = Date.now() + TICKET_TTL_MS
   return {
     ticket,
@@ -125,6 +226,19 @@ function verifyTicket(
     )
 }
 
+/** Fetch a stored file and record its size and media facts (duration, dimensions). */
+async function probeInto(
+  doc: UploadDoc,
+  url: string,
+  kind: MediaKind,
+  contentType: string
+): Promise<void> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(60_000) })
+  if (!response.ok || !response.body) return
+  const buffer = await readCapped(response.body, MAX_UPLOAD_BYTES[kind])
+  Object.assign(doc, { bytes: buffer.length }, probeMedia(buffer, contentType))
+}
+
 export async function recordUpload(
   user: SessionUser,
   raw: unknown
@@ -152,8 +266,13 @@ export async function recordUpload(
     name: input.name.slice(0, 120),
     createdAt: new Date(),
   }
+  const ownKey = ownUploadKey(input.publicUrl, user.id)
   try {
-    if (storageDriver() === "r2") {
+    if (ownKey) {
+      // Direct upload: already in our storage; just probe it.
+      doc.key = ownKey
+      await probeInto(doc, input.publicUrl, kind, contentType)
+    } else if (storageDriver() === "r2") {
       // Platform uploads are tagged temporary; keep our own copy for the library.
       const stored = await copyFromUrl(
         input.publicUrl,
@@ -170,17 +289,7 @@ export async function recordUpload(
       })
     } else {
       // Local dev: the platform can't fetch localhost, so keep its URL and probe only.
-      const response = await fetch(input.publicUrl, {
-        signal: AbortSignal.timeout(60_000),
-      })
-      if (response.ok && response.body) {
-        const buffer = await readCapped(response.body, MAX_UPLOAD_BYTES[kind])
-        Object.assign(
-          doc,
-          { bytes: buffer.length },
-          probeMedia(buffer, contentType)
-        )
-      }
+      await probeInto(doc, input.publicUrl, kind, contentType)
     }
   } catch (caught) {
     if (caught instanceof MediaTooLargeError)

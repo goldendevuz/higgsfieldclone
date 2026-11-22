@@ -80,7 +80,8 @@ export function useTileActions({
       if (item.status === "generating") {
         const elapsed = Date.now() - run.createdAt
         return [
-          ...(run.status === "queued"
+          // OpenRouter documents no cancel endpoint, so its jobs can't be canceled.
+          ...(run.status === "queued" && run.platform !== "openrouter"
             ? [
                 {
                   id: "cancel",

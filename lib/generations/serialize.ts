@@ -1,6 +1,11 @@
 import "server-only"
 
-import type { GenerationDoc, ProjectDoc, UploadDoc } from "@/lib/db/collections"
+import {
+  platformOfDoc,
+  type GenerationDoc,
+  type ProjectDoc,
+  type UploadDoc,
+} from "@/lib/db/collections"
 
 import type { GenerationView, ProjectView, UploadView } from "./view"
 
@@ -10,6 +15,7 @@ export function toGenerationView(doc: GenerationDoc): GenerationView {
     surface: doc.surface,
     modelId: doc.modelId,
     modelLabel: doc.modelLabel,
+    platform: platformOfDoc(doc),
     prompt: doc.prompt,
     settings: doc.settings,
     media: doc.media.map(({ role, kind, url, name }) => ({

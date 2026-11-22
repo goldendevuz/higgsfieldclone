@@ -2,7 +2,12 @@ import "server-only"
 
 import { refundGeneration } from "@/lib/billing/ledger"
 import { grantMonthlyAllowances } from "@/lib/billing/subscriptions"
-import { collections, IN_FLIGHT, TERMINAL } from "@/lib/db/collections"
+import {
+  collections,
+  IN_FLIGHT,
+  platformOfDoc,
+  TERMINAL,
+} from "@/lib/db/collections"
 import { env } from "@/lib/env"
 import { higgsfield } from "@/lib/higgsfield/client"
 
@@ -105,7 +110,12 @@ export async function reconcile(
     await guard(async () => {
       // One last look: it may have finished without a webhook.
       if ((await finalizeGeneration(gen._id)) !== "in_flight") return
-      if (gen.status === "queued" && gen.hfRequestId)
+      // Only Higgsfield can cancel; OpenRouter documents no cancel endpoint.
+      if (
+        gen.status === "queued" &&
+        gen.hfRequestId &&
+        platformOfDoc(gen) === "higgsfield"
+      )
         await higgsfield()
           .cancel(gen.hfRequestId)
           .catch(() => undefined)

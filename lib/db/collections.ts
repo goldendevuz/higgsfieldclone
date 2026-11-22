@@ -2,7 +2,12 @@ import "server-only"
 
 import type { ObjectId } from "mongodb"
 
-import type { MediaKind, MediaRole, Surface } from "@/generation/catalog/types"
+import type {
+  MediaKind,
+  MediaRole,
+  ModelPlatform,
+  Surface,
+} from "@/generation/catalog/types"
 import type { PlanId, BillingInterval } from "@/lib/billing/plans"
 import type { PriceRule } from "@/lib/billing/pricing-types"
 
@@ -60,6 +65,13 @@ export const TERMINAL: readonly GenerationStatus[] = [
   "canceled",
 ]
 
+/** The provider of a stored generation; old documents without `platform` are Higgsfield. */
+export function platformOfDoc(
+  doc: Pick<GenerationDoc, "platform">
+): ModelPlatform {
+  return doc.platform ?? "higgsfield"
+}
+
 export interface GenerationMedia {
   role: MediaRole
   kind: MediaKind
@@ -91,12 +103,22 @@ export interface GenerationDoc {
   surface: Surface
   modelId: string
   modelLabel: string
+  /**
+   * Provider that runs this generation. Documents written before OpenRouter
+   * was added have no `platform` and are Higgsfield (see `platformOfDoc`).
+   */
+  platform?: ModelPlatform
   modelPath: string
   requestBody: Record<string, unknown>
   prompt: string
   settings: Record<string, unknown>
   media: GenerationMedia[]
   status: GenerationStatus
+  /**
+   * The provider's job id: Higgsfield `request_id` or OpenRouter video job
+   * `id`. The name is historical (kept so existing documents, the unique index
+   * and queries keep working); read `platform` to know whose id it is.
+   */
   hfRequestId?: string
   /** Credits charged, and how they split across buckets. */
   cost: number
@@ -105,6 +127,8 @@ export interface GenerationDoc {
   refunded: number
   /** USD our price was based on (for margin reporting). */
   priceUsd: number
+  /** USD the provider billed (OpenRouter `usage.cost`), when reported. */
+  providerCostUsd?: number
   /** How the charge was computed; provisional units are trued up at finalize. */
   billing: {
     units: number

@@ -15,6 +15,7 @@ const PATTERNS = [
   /rk_(live|test)_[0-9a-zA-Z]{10,}/, // Stripe restricted keys
   /re_[0-9a-zA-Z]{8,}_[0-9a-zA-Z]{10,}/, // Resend keys
   /mongodb(\+srv)?:\/\/[^"'\s]*@/, // Mongo URIs with credentials
+  /sk-or-v1-[0-9a-f]{20,}/, // OpenRouter API keys
 ]
 // Exact values of server env vars, when set in this build's environment.
 const SECRET_ENV = [
@@ -22,6 +23,8 @@ const SECRET_ENV = [
   "AUTH_RESEND_KEY",
   "HF_CREDENTIALS",
   "HF_WEBHOOK_SECRET",
+  "OPENROUTER_API_KEY",
+  "OPENROUTER_WEBHOOK_SECRET",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "R2_ACCESS_KEY_ID",

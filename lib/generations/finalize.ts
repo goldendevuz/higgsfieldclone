@@ -7,6 +7,7 @@ import { roundCredits } from "@/lib/billing/price"
 import {
   collections,
   IN_FLIGHT,
+  platformOfDoc,
   type GenerationDoc,
   type GenerationOutput,
 } from "@/lib/db/collections"
@@ -15,14 +16,17 @@ import { describeTerminal } from "@/lib/higgsfield/errors"
 import {
   PLATFORM_TERMINAL,
   type PlatformArtifact,
+  type RequestStatus,
 } from "@/lib/higgsfield/types"
+import { openrouter } from "@/lib/openrouter/client"
 import { copyFromUrl } from "@/lib/storage"
 
 /**
  * finalizeGeneration — the only way a run reaches a terminal state. Called by
  * the webhook, the reconciler and user refreshes; safe to call concurrently
  * and repeatedly:
- *   1. re-fetch the status from the platform (payloads are never trusted);
+ *   1. re-fetch the status from the platform (payloads are never trusted) —
+ *      Higgsfield or OpenRouter, whichever ran the generation;
  *   2. take a lease so only one caller copies outputs;
  *   3. copy outputs to our storage, or refund failed/nsfw/canceled runs;
  *   4. commit with a conditional update (status still in flight).
@@ -42,15 +46,24 @@ export type FinalizeOutcome =
   | "refunded"
   | "copy_retry"
 
-type Deps = { status: typeof higgsfieldStatus; copy: typeof copyFromUrl }
+type Deps = {
+  status: (gen: GenerationDoc, requestId: string) => Promise<RequestStatus>
+  copy: typeof copyFromUrl
+}
 
-async function higgsfieldStatus(requestId: string) {
-  return higgsfield().status(requestId)
+/** Ask the provider that owns the generation (old documents are Higgsfield). */
+async function providerStatus(
+  gen: GenerationDoc,
+  requestId: string
+): Promise<RequestStatus> {
+  return platformOfDoc(gen) === "openrouter"
+    ? openrouter().status(requestId)
+    : higgsfield().status(requestId)
 }
 
 export async function finalizeGeneration(
   generationId: ObjectId,
-  deps: Deps = { status: higgsfieldStatus, copy: copyFromUrl }
+  deps: Deps = { status: providerStatus, copy: copyFromUrl }
 ): Promise<FinalizeOutcome> {
   const { generations } = await collections()
   const gen = await generations.findOne({ _id: generationId })
@@ -58,7 +71,7 @@ export async function finalizeGeneration(
   if (!IN_FLIGHT.includes(gen.status)) return "already_terminal"
   if (!gen.hfRequestId) return "not_submitted"
 
-  const status = await deps.status(gen.hfRequestId)
+  const status = await deps.status(gen, gen.hfRequestId)
   if (!PLATFORM_TERMINAL.has(status.status)) {
     const next = status.status === "in_progress" ? "in_progress" : gen.status
     await generations.updateOne(
@@ -113,7 +126,10 @@ export async function finalizeGeneration(
       },
       { returnDocument: "after" }
     )
-    if (committed) await trueUp(committed)
+    if (committed) {
+      await trueUp(committed)
+      await recordProviderCost(committed, status.costUsd)
+    }
     return "completed"
   }
 
@@ -161,6 +177,10 @@ async function copyOutputs(
     try {
       const stored = await copy(artifact.url, `${base}/${index}`, {
         contentType: artifact.contentType ?? defaultType(kind),
+        // Key-protected downloads (OpenRouter) send the key to its origin only.
+        ...(artifact.authorized
+          ? { headers: openrouter().mediaHeaders(artifact.url) }
+          : {}),
       })
       outputs.push({
         kind,
@@ -172,7 +192,8 @@ async function copyOutputs(
         ...(stored.height ? { height: stored.height } : {}),
         ...(stored.durationSec ? { durationSec: stored.durationSec } : {}),
         storage: stored.storage,
-        platformUrl: artifact.url,
+        // A key-protected URL is useless to anyone else; never store it.
+        ...(artifact.authorized ? {} : { platformUrl: artifact.url }),
       })
     } catch (error) {
       console.error(
@@ -180,14 +201,18 @@ async function copyOutputs(
         error instanceof Error ? error.message : error
       )
       if (gen.finalizeAttempts < MAX_COPY_ATTEMPTS) return null
-      // Keep the platform URL (retained ≥ 7 days); the reconciler retries the copy.
+      // Keep a key-less platform URL (retained ≥ 7 days); the reconciler
+      // retries the copy. A key-protected one can't be shown to the user, so
+      // without a signed fallback we keep retrying instead.
+      const keepUrl = artifact.authorized ? artifact.fallbackUrl : artifact.url
+      if (!keepUrl) return null
       outputs.push({
         kind,
-        url: artifact.url,
+        url: keepUrl,
         key: "",
         contentType: artifact.contentType ?? defaultType(kind),
         storage: "platform",
-        platformUrl: artifact.url,
+        platformUrl: keepUrl,
       })
     }
   }
@@ -200,6 +225,27 @@ function defaultType(kind: string): string {
     : kind === "audio"
       ? "audio/mpeg"
       : "image/png"
+}
+
+/**
+ * OpenRouter reports what it billed (`usage.cost`, USD). Keep it on the
+ * generation and say loudly when it exceeds the USD basis we charged from, so
+ * a wrong price rule shows up on the first run.
+ */
+async function recordProviderCost(
+  gen: GenerationDoc,
+  costUsd: number | undefined
+): Promise<void> {
+  if (costUsd === undefined) return
+  const { generations } = await collections()
+  await generations.updateOne(
+    { _id: gen._id },
+    { $set: { providerCostUsd: costUsd } }
+  )
+  const line = `${gen.modelId}: provider billed $${costUsd.toFixed(4)}, our basis $${gen.priceUsd.toFixed(4)} (${gen.cost} credits charged)`
+  if (costUsd > gen.priceUsd * 1.01)
+    console.error(`[pricing] provider cost above our price basis. ${line}`)
+  else console.info(`[pricing] ${line}`)
 }
 
 /**

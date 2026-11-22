@@ -219,6 +219,15 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     [finalPrompt, media, model, pricing.table, settings]
   )
 
+  // OpenRouter bills real money per second with no estimate endpoint, so a
+  // costly run gets a visible warning (threshold: OPENROUTER_WARN_USD).
+  const costWarning =
+    model?.platform === "openrouter" &&
+    quote &&
+    quote.credits >= pricing.expensiveCredits
+      ? `Costly run: ${quote.credits} credits. Try a draft first: Seedance 2.0 Mini at 480p, a shorter clip, or 480p.`
+      : undefined
+
   const hasInput = finalPrompt.trim().length > 0 || media.length > 0
   // The endpoint these settings reach has no price (yet) on this deployment.
   const unpriced = Boolean(validation.path && !pricing.table[validation.path])
@@ -447,6 +456,7 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     },
     library: { items: libraryItems, onUpload: upload },
     quote,
+    costWarning,
     canGenerate,
     disabledReason,
     generate,

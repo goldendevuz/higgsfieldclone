@@ -1,8 +1,8 @@
 import "server-only"
 
-import { MODELS } from "@/generation/catalog"
+import { MODELS, platformOf } from "@/generation/catalog"
 import { collections } from "@/lib/db/collections"
-import { env } from "@/lib/env"
+import { env, providersConfigured } from "@/lib/env"
 
 import { creditConfig } from "./config"
 import { fromPrice, toCreditTable, type CreditTable } from "./price"
@@ -22,6 +22,8 @@ export type PricingContext = {
   usd: PricingTable
   credits: CreditTable
   disabled: Set<string>
+  /** Models whose provider has no credentials here; hidden from the UI and refused on submit. */
+  unavailable: Set<string>
   /** Placeholder rules still in use (shown as a warning in admin). */
   placeholderPaths: string[]
 }
@@ -49,10 +51,17 @@ export async function pricingContext(fresh = false): Promise<PricingContext> {
         Object.entries(usd).filter(([, rule]) => rule.source !== "placeholder")
       )
     : usd
+  const configured = providersConfigured()
+  const unavailable = new Set(
+    MODELS.filter((model) => !configured[platformOf(model)]).map(
+      (model) => model.id
+    )
+  )
   const value: PricingContext = {
     usd,
     credits: toCreditTable(sellable, creditConfig()),
     disabled,
+    unavailable,
     placeholderPaths: Object.entries(usd)
       .filter(([, rule]) => rule.source === "placeholder")
       .map(([path]) => path),
@@ -77,8 +86,11 @@ export function invalidatePricing(): void {
 /** What client pages need: credit rules (no USD) and enabled model ids. */
 export type ClientPricing = {
   table: CreditTable
+  /** Admin-disabled models plus those whose provider isn't configured. */
   disabled: string[]
   fromPrices: Record<string, number>
+  /** Credits above which an OpenRouter run shows a cost warning. */
+  expensiveCredits: number
 }
 
 export async function clientPricing(): Promise<ClientPricing> {
@@ -88,9 +100,12 @@ export async function clientPricing(): Promise<ClientPricing> {
     const price = fromPrice(model.id, context.credits)
     if (price !== null) fromPrices[model.id] = price
   }
+  const { OPENROUTER_WARN_USD } = env()
+  const { markup, creditUsd } = creditConfig()
   return {
     table: context.credits,
-    disabled: [...context.disabled],
+    disabled: [...new Set([...context.disabled, ...context.unavailable])],
     fromPrices,
+    expensiveCredits: Math.ceil((OPENROUTER_WARN_USD * markup) / creditUsd),
   }
 }

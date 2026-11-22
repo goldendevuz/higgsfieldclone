@@ -7,6 +7,7 @@ import {
   Loader2,
   Pencil,
   Sparkle,
+  TriangleAlert,
   Volume2,
   VolumeX,
   Wand2,
@@ -242,7 +243,8 @@ export function GenerateButton({
   generator: Generator
   className?: string
 }) {
-  const { quote, canGenerate, disabledReason, submitting } = generator
+  const { quote, canGenerate, disabledReason, submitting, costWarning } =
+    generator
   const blocked = !canGenerate
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -276,6 +278,12 @@ export function GenerateButton({
           className="text-center text-xs text-muted-foreground"
         >
           {disabledReason}
+        </p>
+      ) : null}
+      {costWarning ? (
+        <p role="status" className="flex items-start gap-1.5 text-xs text-pink">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {costWarning}
         </p>
       ) : null}
     </div>

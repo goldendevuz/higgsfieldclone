@@ -20,6 +20,9 @@ export function setupEnv(): void {
     HF_WEBHOOK_SECRET: "webhook-secret",
     HF_WEBHOOK_BASE_URL: "https://vireo.test",
     HF_PRICE_GUARD: "false",
+    OPENROUTER_API_KEY: "sk-or-v1-test-key-0123456789",
+    OPENROUTER_API_BASE_URL: "https://or.test/api/v1",
+    OPENROUTER_MAX_USD_PER_RUN: "2",
     CREDIT_USD_VALUE: "0.01",
     CREDIT_MARKUP: "2",
     RUN_TIMEOUT_MINUTES: "30",
@@ -277,4 +280,195 @@ export function tinyWav(seconds: number): Uint8Array<ArrayBuffer> {
   buffer.write("data", 36, "ascii")
   buffer.writeUInt32LE(byteRate * seconds, 40)
   return new Uint8Array(Buffer.concat([buffer, data]))
+}
+
+/* ── Fake OpenRouter video API ───────────────────────────────────────────── */
+
+export const OR_BASE = "https://or.test/api/v1"
+export const OR_KEY = "sk-or-v1-test-key-0123456789"
+
+export type FakeJob = {
+  status: string
+  body: Record<string, unknown>
+  callback?: string
+  error?: string
+  cost?: number
+  /** Listed in `unsigned_urls` (defaults to the content endpoint). */
+  unsignedUrls?: string[]
+  /** Signed, key-less copies (`urls`). */
+  signedUrls?: string[]
+}
+
+export type SeenRequest = {
+  method: string
+  url: string
+  authorization: string | null
+}
+
+export class FakeOpenRouter {
+  jobs = new Map<string, FakeJob>()
+  submits: { body: Record<string, unknown>; authorization: string | null }[] =
+    []
+  seen: SeenRequest[] = []
+  /** Next submit response: "ok" | an HTTP status | "network" (ambiguous). */
+  nextSubmit: "ok" | number | "network" = "ok"
+  /** Extra files served by URL (signed storage URLs and so on). */
+  files = new Map<string, { body: Uint8Array<ArrayBuffer>; type: string }>()
+  /** Content downloads that should fail with this status (copy-failure tests). */
+  contentStatus?: number
+  private counter = 0
+
+  /** Make a submitted job reach a terminal state. */
+  finish(
+    id: string,
+    state: "completed" | "failed" | "expired" | "cancelled",
+    extra: Partial<FakeJob> = {}
+  ) {
+    const job = this.jobs.get(id)!
+    job.status = state
+    if (state !== "completed") job.error ??= `Job ${state} (test)`
+    Object.assign(job, extra)
+  }
+
+  lastJobId(): string {
+    return [...this.jobs.keys()].at(-1)!
+  }
+
+  fetch: typeof fetch = async (input, init) => {
+    const url = new URL(
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url
+    )
+    const method = init?.method ?? "GET"
+    const headers = new Headers(init?.headers)
+    this.seen.push({
+      method,
+      url: url.href,
+      authorization: headers.get("authorization"),
+    })
+    const json = (data: unknown, status = 200) =>
+      new Response(data === null ? null : JSON.stringify(data), {
+        status,
+        headers: { "content-type": "application/json" },
+      })
+    const file = this.files.get(url.href)
+    if (file)
+      return new Response(file.body, {
+        headers: {
+          "content-type": file.type,
+          "content-length": String(file.body.byteLength),
+        },
+      })
+    if (url.host !== "or.test") return new Response("missing", { status: 404 })
+    if (headers.get("authorization") !== `Bearer ${OR_KEY}`)
+      return json(
+        { error: { code: 401, message: "Missing Authentication header" } },
+        401
+      )
+
+    const content = url.pathname.match(/^\/api\/v1\/videos\/([^/]+)\/content$/)
+    if (content && method === "GET") {
+      const job = this.jobs.get(content[1]!)
+      if (!job || job.status !== "completed")
+        return json(
+          { error: { code: 404, message: "Resource not found" } },
+          404
+        )
+      if (this.contentStatus)
+        return json(
+          { error: { code: this.contentStatus, message: "boom" } },
+          this.contentStatus
+        )
+      const video = tinyMp4(6)
+      return new Response(video, {
+        headers: {
+          "content-type": "video/mp4",
+          "content-length": String(video.byteLength),
+        },
+      })
+    }
+    const poll = url.pathname.match(/^\/api\/v1\/videos\/([^/]+)$/)
+    if (poll && method === "GET") {
+      const id = poll[1]!
+      const job = this.jobs.get(id)
+      if (!job)
+        return json(
+          { error: { code: 404, message: "Resource not found" } },
+          404
+        )
+      return json({
+        id,
+        generation_id: id,
+        polling_url: `${OR_BASE}/videos/${id}`,
+        status: job.status,
+        ...(job.status === "completed"
+          ? {
+              unsigned_urls: job.unsignedUrls ?? [
+                `${OR_BASE}/videos/${id}/content?index=0`,
+              ],
+              ...(job.signedUrls ? { urls: job.signedUrls } : {}),
+              usage: { cost: job.cost ?? 0.4112, is_byok: false },
+            }
+          : {}),
+        ...(job.error && job.status !== "completed"
+          ? { error: job.error }
+          : {}),
+      })
+    }
+    if (url.pathname === "/api/v1/videos" && method === "POST") {
+      const outcome = this.nextSubmit
+      this.nextSubmit = "ok"
+      if (outcome === "network") throw new TypeError("fetch failed")
+      if (typeof outcome === "number")
+        return json(
+          {
+            error: { code: outcome, message: `Rejected by test (${outcome})` },
+          },
+          outcome
+        )
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >
+      this.submits.push({
+        body,
+        authorization: headers.get("authorization"),
+      })
+      const id = `gen-vid-1790000000-${String(++this.counter).padStart(20, "A")}`
+      this.jobs.set(id, {
+        status: "pending",
+        body,
+        callback:
+          typeof body.callback_url === "string" ? body.callback_url : undefined,
+      })
+      return json(
+        {
+          id,
+          generation_id: id,
+          polling_url: `${OR_BASE}/videos/${id}`,
+          status: "pending",
+        },
+        202
+      )
+    }
+    return json({ error: { code: 404, message: "Unhandled" } }, 404)
+  }
+}
+
+export async function installFakeOpenRouter(): Promise<FakeOpenRouter> {
+  const fake = new FakeOpenRouter()
+  const { createOpenRouterClient, setOpenRouterClientForTests } =
+    await import("@/lib/openrouter/client")
+  setOpenRouterClientForTests(
+    createOpenRouterClient({
+      apiKey: OR_KEY,
+      baseUrl: OR_BASE,
+      fetch: fake.fetch,
+      sleep: async () => undefined,
+    })
+  )
+  return fake
 }

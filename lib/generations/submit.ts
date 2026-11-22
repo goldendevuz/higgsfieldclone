@@ -3,7 +3,7 @@ import "server-only"
 import { ObjectId } from "mongodb"
 import { z } from "zod"
 
-import { findModel, parseSettings } from "@/generation/catalog"
+import { findModel, parseSettings, platformOf } from "@/generation/catalog"
 import { groupMedia, inferInputMode } from "@/generation/catalog/media-inputs"
 import type { GenerationPlane } from "@/generation/catalog/types"
 import { toPlatform } from "@/generation/to-platform"
@@ -27,6 +27,7 @@ import { pricingContext } from "@/lib/billing/pricing"
 import {
   collections,
   IN_FLIGHT,
+  platformOfDoc,
   type GenerationDoc,
 } from "@/lib/db/collections"
 import { env } from "@/lib/env"
@@ -38,6 +39,14 @@ import {
 } from "@/lib/higgsfield/client"
 import { describePlatformError } from "@/lib/higgsfield/errors"
 import { webhookUrlFor } from "@/lib/higgsfield/webhook"
+import {
+  openrouter,
+  OpenRouterError,
+  OpenRouterNotConfiguredError,
+} from "@/lib/openrouter/client"
+import { describeOpenRouterError } from "@/lib/openrouter/errors"
+import { InlineMediaError, withSendableMedia } from "@/lib/openrouter/media"
+import { openRouterCallbackUrlFor } from "@/lib/openrouter/webhook"
 import { enforceRateLimit, LIMITS } from "@/lib/rate-limit"
 
 import { resolveOwnedMedia } from "./media"
@@ -155,11 +164,12 @@ export async function submitGeneration(
   const model = findModel(input.modelId)
   if (!model) throw new UserFacingError("Unknown model.", "UNKNOWN_MODEL")
   const pricing = await pricingContext()
-  if (pricing.disabled.has(model.id))
+  if (pricing.disabled.has(model.id) || pricing.unavailable.has(model.id))
     throw new UserFacingError(
       "This model is currently unavailable.",
       "MODEL_DISABLED"
     )
+  const platform = platformOf(model)
 
   const media = await resolveOwnedMedia(user.objectId, input.media)
   let plane: GenerationPlane
@@ -189,7 +199,17 @@ export async function submitGeneration(
     )
   const quote = quoteRequest(request, media, pricing.credits)
   const priceUsd = usdForRequest(usdRule, request, media, quote.units)
-  await guardPrice(model.id, request.path, request.body, priceUsd)
+  if (platform === "higgsfield")
+    await guardPrice(model.id, request.path, request.body, priceUsd)
+  else {
+    // OpenRouter has no estimate endpoint, so the guard is our own per-run cap.
+    const cap = env().OPENROUTER_MAX_USD_PER_RUN
+    if (cap > 0 && priceUsd > cap)
+      throw new UserFacingError(
+        `This run would cost about $${priceUsd.toFixed(2)}, above the $${cap.toFixed(2)} per-run limit. Lower the resolution or duration.`,
+        "OVER_BUDGET"
+      )
+  }
 
   let projectId: ObjectId | null = null
   if (input.projectId) {
@@ -214,6 +234,7 @@ export async function submitGeneration(
     surface: model.surface,
     modelId: model.id,
     modelLabel: model.label,
+    platform,
     modelPath: request.path,
     requestBody: request.body,
     prompt: plane.prompt.text,
@@ -291,6 +312,41 @@ export async function submitGeneration(
   return toGenerationView(await sendToPlatform(doc))
 }
 
+/** What a provider answered when it accepted a generation. */
+type Accepted = { requestId: string; status: string }
+
+async function submitToHiggsfield(doc: GenerationDoc): Promise<Accepted> {
+  const queued = await higgsfield().submit(
+    doc.modelPath,
+    doc.requestBody,
+    webhookUrlFor(doc._id.toHexString())
+  )
+  return { requestId: queued.requestId, status: queued.status }
+}
+
+async function submitToOpenRouter(doc: GenerationDoc): Promise<Accepted> {
+  // Local images are inlined here, for this request only (never stored).
+  const body = await withSendableMedia(doc.requestBody)
+  const job = await openrouter().submit(
+    body,
+    openRouterCallbackUrlFor(doc._id.toHexString())
+  )
+  return { requestId: job.id, status: job.status }
+}
+
+function describeSubmitError(caught: unknown): {
+  message: string
+  operatorAlert?: string
+} {
+  if (caught instanceof PlatformNotConfiguredError)
+    return { message: "Generation isn't configured on this server yet." }
+  if (caught instanceof OpenRouterNotConfiguredError)
+    return { message: "This model isn't configured on this server yet." }
+  if (caught instanceof InlineMediaError) return { message: caught.message }
+  if (caught instanceof OpenRouterError) return describeOpenRouterError(caught)
+  return describePlatformError(caught)
+}
+
 /** Submit a pending generation. Definite failures refund; ambiguous ones wait for the reconciler. */
 export async function sendToPlatform(
   doc: GenerationDoc
@@ -298,11 +354,11 @@ export async function sendToPlatform(
   const { generations } = await collections()
   const id = doc._id
   try {
-    const queued = await higgsfield().submit(
-      doc.modelPath,
-      doc.requestBody,
-      webhookUrlFor(id.toHexString())
-    )
+    const queued =
+      platformOfDoc(doc) === "openrouter"
+        ? await submitToOpenRouter(doc)
+        : await submitToHiggsfield(doc)
+    // OpenRouter's "pending" and Higgsfield's "queued" both mean waiting.
     const status = queued.status === "in_progress" ? "in_progress" : "queued"
     const updated = await generations.findOneAndUpdate(
       { _id: id, status: "pending_submit" },
@@ -324,13 +380,10 @@ export async function sendToPlatform(
       )
       return doc
     }
-    const described =
-      caught instanceof PlatformNotConfiguredError
-        ? { message: "Generation isn't configured on this server yet." }
-        : describePlatformError(caught)
+    const described = describeSubmitError(caught)
     if ("operatorAlert" in described && described.operatorAlert)
       console.error(`[submit] OPERATOR ALERT: ${described.operatorAlert}`)
-    if (caught instanceof PlatformError)
+    if (caught instanceof PlatformError || caught instanceof OpenRouterError)
       console.warn(
         `[submit] platform rejected ${doc.modelPath}: ${caught.status} ${caught.message}`
       )
