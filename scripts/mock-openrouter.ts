@@ -5,6 +5,7 @@
  *   POST /api/v1/videos              → 202 {id, generation_id, polling_url, status}
  *   GET  /api/v1/videos/{id}         → pending → in_progress → completed | failed
  *   GET  /api/v1/videos/{id}/content → the MP4 (needs the Authorization header)
+ *   POST /api/v1/chat/completions → a deterministic prompt expansion ("[expand-fail]" → 500)
  *   callback_url                     → POST {type: "video.generation.<status>", data}
  *
  *   pnpm mock:openrouter             # http://localhost:4020/api/v1
@@ -143,6 +144,28 @@ async function notify(id: string, job: Job) {
   }
 }
 
+/** Deterministic stand-in for the text model: a structured expansion of the idea. */
+function mockExpansion(user: string): string {
+  const idea = /^Idea: (.*)$/m.exec(user)?.[1] ?? "a scene"
+  const beats = [...user.matchAll(/Beat (\d+) (\d+)-(\d+) s/g)]
+  if (!beats.length)
+    return `Subject: ${idea}, with vivid specific details.\nSetting: a dramatic location at golden hour.\nComposition: wide framing with strong depth.\nLook: cinematic light, rich palette.`
+  const names = ["PILOT", "MISSILE", "IMPACT", "AFTERMATH", "ESCAPE", "SILENCE"]
+  const lines = [
+    `Opening frame: ${idea}, a wide establishing shot.`,
+    ...beats.map(
+      (beat, i) =>
+        `Beat ${beat[1]} (${beat[2]}-${beat[3]} s) ${names[i % names.length]}: the story moves forward. Camera: one continuous move.`
+    ),
+    "Look: dramatic rim light, teal and orange palette, cinematic realism.",
+  ]
+  if (user.includes("Audio: on"))
+    lines.push(
+      "Audio: deep sub-bass drone, crisp effects, rising orchestral score."
+    )
+  return lines.join("\n")
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", ORIGIN)
   const method = req.method ?? "GET"
@@ -154,6 +177,27 @@ const server = createServer(async (req, res) => {
     }
     if (method === "GET" && url.pathname === "/api/v1/videos/models")
       return send(res, 200, { data: [] })
+
+    if (method === "POST" && url.pathname === "/api/v1/chat/completions") {
+      const body = JSON.parse((await readBody(req)).toString() || "{}") as {
+        messages?: { role?: string; content?: string }[]
+      }
+      const user =
+        body.messages?.find((message) => message.role === "user")?.content ?? ""
+      if (user.includes("[expand-fail]"))
+        return fail(res, 500, "Mock expansion failure")
+      return send(res, 200, {
+        id: "gen-mock-chat",
+        choices: [
+          {
+            index: 0,
+            finish_reason: "stop",
+            message: { role: "assistant", content: mockExpansion(user) },
+          },
+        ],
+        usage: { prompt_tokens: 300, completion_tokens: 250, cost: 0.00004 },
+      })
+    }
 
     if (method === "POST" && url.pathname === "/api/v1/videos") {
       const body = JSON.parse(
